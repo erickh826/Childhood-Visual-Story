@@ -1,8 +1,21 @@
-import OpenAI from "openai";
+import { AzureOpenAI } from "openai";
 import type { AgeGroup, VisualStyle, StoryNode, Choice } from "@shared/schema";
 
+/**
+ * Returns an AzureOpenAI client.
+ * Required env vars:
+ *   AZURE_OPENAI_API_KEY      — Azure resource key (Keys & Endpoint in portal)
+ *   AZURE_OPENAI_ENDPOINT     — e.g. https://YOUR-RESOURCE.openai.azure.com
+ *   AZURE_OPENAI_DEPLOYMENT   — your deployment name (e.g. gpt-4o-mini)
+ *   AZURE_OPENAI_API_VERSION  — e.g. 2024-12-01-preview  (optional, defaults below)
+ */
 function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "sk-placeholder" });
+  return new AzureOpenAI({
+    apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
+    apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
+    deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+  });
 }
 
 // ── Age → prompt constraints ─────────────────────────────────────────────────
@@ -95,7 +108,7 @@ Rules:
 - Do NOT include ${NEGATIVE_PROMPT} in image_prompt`;
 
   const response = await getOpenAI().chat.completions.create({
-    model: "gpt-4o-mini",
+    model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -198,7 +211,7 @@ Return this JSON:
 }`;
 
   const response = await getOpenAI().chat.completions.create({
-    model: "gpt-4o-mini",
+    model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },

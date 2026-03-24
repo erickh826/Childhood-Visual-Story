@@ -10,7 +10,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { createHash } from "crypto";
 import { v4 as uuidv4 } from "uuid";
-import OpenAI from "openai";
+import { AzureOpenAI } from "openai";
 
 // ─── Inline in-memory storage (replaces SQLite for Vercel) ──────────────────
 interface LessonRecord {
@@ -82,10 +82,15 @@ function makeSeed(key: string) { return parseInt(key.slice(0, 8), 16) % 21474836
 function estimateTextCost(i: number, o: number) { return i * 0.00000015 + o * 0.0000006; }
 
 async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new AzureOpenAI({
+    apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
+    apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
+    deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+  });
   const ageC = AGE_PROMPTS[ageGroup];
   const resp = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -232,10 +237,15 @@ app.post("/api/branch", async (req: Request, res: Response) => {
     if (existing) return res.json({ node: existing, cached: true });
   }
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new AzureOpenAI({
+    apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
+    apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
+    deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+  });
     const style = visual_style as VisualStyle;
     const resp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
       messages: [
         { role: "system", content: `Early childhood educator. ${AGE_PROMPTS[age_group as AgeGroup]} Write in Traditional Chinese except image_prompt (English). Return JSON only.` },
         { role: "user", content: `Child chose: "${choice_text}". Context: "${parent_script_context}". Topic: ${topic}. Return: {"avatar_script":"...","teacher_prompt":"...","image_prompt":"English, ${STYLE_PROMPTS[style]}, under 40 words"}` },
