@@ -253,17 +253,8 @@ export default function Player() {
 
   // Voice: simple state values, passed directly to speakText() each call
   const [voiceLang, setVoiceLang] = useState<string>("zh-TW");
-<<<<<<< HEAD
-  // Supported languages for narration
-  const LANG_OPTIONS = [
-    { value: "zh-TW", label: "繁體中文 (🇹🇼)" },
-    { value: "zh-HK", label: "粵語 (🇭🇰)" },
-    { value: "en-US", label: "English (🇺🇸)" },
-  ];
-=======
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
->>>>>>> cbd1f03730bc7dae46632f253b482ff57a30c6f2
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>("bear");
   const nodeRef = useRef<HTMLDivElement>(null);
 
