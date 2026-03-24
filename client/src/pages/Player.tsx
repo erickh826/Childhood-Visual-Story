@@ -222,8 +222,8 @@ function useNarration(lang: string = "zh-TW") {
   const [enabled, setEnabled] = useState(true);
   const langRef = useRef(lang);
 
-  // Keep ref in sync so speak() always uses current lang (no stale closure)
-  useEffect(() => { langRef.current = lang; }, [lang]);
+  // Keep ref in sync on every render — runs synchronously before effects
+  langRef.current = lang;
 
   // FIX 1: Cancel speech on unmount (leaving the page stops the voice)
   useEffect(() => {
@@ -263,7 +263,7 @@ function useNarration(lang: string = "zh-TW") {
     setEnabled((e) => !e);
   }, [stop]);
 
-  return { speak, stop, isSpeaking, enabled, toggle };
+  return { speak, stop, isSpeaking, enabled, toggle, langRef };
 }
 
 export default function Player() {
@@ -282,7 +282,7 @@ export default function Player() {
   const [voiceLang, setVoiceLang] = useState<string>("zh-TW");
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>("bear");
 
-  const { speak, isSpeaking, enabled, toggle, stop } = useNarration(voiceLang);
+  const { speak, isSpeaking, enabled, toggle, stop, langRef } = useNarration(voiceLang);
   const nodeRef = useRef<HTMLDivElement>(null);
 
   const { data: lesson, isLoading, isError } = useQuery({
@@ -339,13 +339,16 @@ export default function Player() {
     if (lesson?.story_nodes?.[0]) {
       setVisitedNodes([lesson.story_nodes[0]]);
       if (lesson.metadata.voice_lang) {
+        // Update ref directly and synchronously so speak() fires with the correct lang
+        langRef.current = lesson.metadata.voice_lang;
         setVoiceLang(lesson.metadata.voice_lang);
       }
       if (lesson.metadata.avatar_style) {
         setAvatarStyle(lesson.metadata.avatar_style as AvatarStyle);
       }
-      // Delay speak so state+ref have time to update
-      setTimeout(() => speak(lesson.story_nodes[0].avatar_script), 500);
+      // Speak after a short delay to allow the browser to initialise voices
+      const text = lesson.story_nodes[0].avatar_script;
+      setTimeout(() => speak(text), 600);
     }
   }, [lesson]);
 

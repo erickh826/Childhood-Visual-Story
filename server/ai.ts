@@ -166,7 +166,7 @@ export async function generateImages(
   const imageJobs = prompts.map(async (prompt) => {
     const fullPrompt = `${prompt}, ${styleSuffix}`;
     try {
-      const res = await fetch("https://fal.run/fal-ai/flux-lora", {
+      const res = await fetch("https://fal.run/fal-ai/flux/schnell", {
         method: "POST",
         headers: {
           Authorization: `Key ${process.env.FAL_API_KEY}`,
@@ -176,17 +176,10 @@ export async function generateImages(
           prompt: fullPrompt,
           negative_prompt: NEGATIVE_PROMPT,
           image_size: "square_hd",
-          num_inference_steps: 8,
-          guidance_scale: 3.5,
+          num_inference_steps: 4,
           seed,
           num_images: 1,
           enable_safety_checker: true,
-          // Style LoRA per visual style for consistency
-          loras: styleSuffix.includes("watercolor")
-            ? [{ path: "https://huggingface.co/Shakker-Labs/FLUX.1-dev-LoRA-Children-Simple-Sketch/resolve/main/FLUX.1-dev-LoRA-Children-Simple-Sketch.safetensors", scale: 0.7 }]
-            : styleSuffix.includes("crayon")
-            ? [{ path: "https://huggingface.co/alvdansen/frosting_lane_flux/resolve/main/flux_dev_frostinglane_araminta_k.safetensors", scale: 0.65 }]
-            : [{ path: "https://huggingface.co/Shakker-Labs/FLUX.1-dev-LoRA-Children-Simple-Sketch/resolve/main/FLUX.1-dev-LoRA-Children-Simple-Sketch.safetensors", scale: 0.6 }],
         }),
       });
       if (!res.ok) {

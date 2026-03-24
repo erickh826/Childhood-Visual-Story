@@ -177,21 +177,17 @@ async function generateImages(prompts: string[], style: VisualStyle, seed: numbe
   const suffix = STYLE_PROMPTS[style];
   return Promise.all(prompts.map(async (p) => {
     try {
-      const r = await fetch("https://fal.run/fal-ai/flux-lora", {
+      const r = await fetch("https://fal.run/fal-ai/flux/schnell", {
         method: "POST",
         headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: `${p}, ${suffix}`,
           negative_prompt: NEGATIVE,
           image_size: "square_hd",
-          num_inference_steps: 8,
-          guidance_scale: 3.5,
+          num_inference_steps: 4,
           seed,
           num_images: 1,
           enable_safety_checker: true,
-          loras: suffix.includes("watercolor") || suffix.includes("kawaii")
-            ? [{ path: "https://huggingface.co/Shakker-Labs/FLUX.1-dev-LoRA-Children-Simple-Sketch/resolve/main/FLUX.1-dev-LoRA-Children-Simple-Sketch.safetensors", scale: 0.65 }]
-            : [{ path: "https://huggingface.co/alvdansen/frosting_lane_flux/resolve/main/flux_dev_frostinglane_araminta_k.safetensors", scale: 0.65 }],
         }),
       });
       const d: any = await r.json();
