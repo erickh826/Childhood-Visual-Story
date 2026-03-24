@@ -86,11 +86,11 @@ async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: Vis
     apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
     endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
     apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
-    deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+    deployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
   });
   const ageC = AGE_PROMPTS[ageGroup];
   const resp = await openai.chat.completions.create({
-    model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -241,11 +241,11 @@ app.post("/api/branch", async (req: Request, res: Response) => {
     apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
     endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
     apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
-    deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+    deployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
   });
     const style = visual_style as VisualStyle;
     const resp = await openai.chat.completions.create({
-      model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+      model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
       messages: [
         { role: "system", content: `Early childhood educator. ${AGE_PROMPTS[age_group as AgeGroup]} Write in Traditional Chinese except image_prompt (English). Return JSON only.` },
         { role: "user", content: `Child chose: "${choice_text}". Context: "${parent_script_context}". Topic: ${topic}. Return: {"avatar_script":"...","teacher_prompt":"...","image_prompt":"English, ${STYLE_PROMPTS[style]}, under 40 words"}` },

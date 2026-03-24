@@ -14,7 +14,7 @@ function getOpenAI() {
     apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
     endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
     apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
-    deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+    deployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
   });
 }
 
@@ -108,7 +108,7 @@ Rules:
 - Do NOT include ${NEGATIVE_PROMPT} in image_prompt`;
 
   const response = await getOpenAI().chat.completions.create({
-    model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -211,7 +211,7 @@ Return this JSON:
 }`;
 
   const response = await getOpenAI().chat.completions.create({
-    model: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini",
+    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
