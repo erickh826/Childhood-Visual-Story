@@ -280,6 +280,12 @@ export default function Player() {
 
   // FIX 2: Store lang in state AND ref so speak() picks it up immediately
   const [voiceLang, setVoiceLang] = useState<string>("zh-TW");
+  // Supported languages for narration
+  const LANG_OPTIONS = [
+    { value: "zh-TW", label: "繁體中文 (🇹🇼)" },
+    { value: "zh-HK", label: "粵語 (🇭🇰)" },
+    { value: "en-US", label: "English (🇺🇸)" },
+  ];
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>("bear");
 
   const { speak, isSpeaking, enabled, toggle, stop, langRef } = useNarration(voiceLang);
@@ -339,7 +345,7 @@ export default function Player() {
     if (lesson?.story_nodes?.[0]) {
       setVisitedNodes([lesson.story_nodes[0]]);
       if (lesson.metadata.voice_lang) {
-        // Update ref directly and synchronously so speak() fires with the correct lang
+        // Update both ref and state so UI and narration are in sync
         langRef.current = lesson.metadata.voice_lang;
         setVoiceLang(lesson.metadata.voice_lang);
       }
@@ -350,7 +356,7 @@ export default function Player() {
       const text = lesson.story_nodes[0].avatar_script;
       setTimeout(() => speak(text), 600);
     }
-  }, [lesson]);
+  }, [lesson, langRef, speak]);
 
   const currentNode = getCurrentNode();
   const baseNodeCount = lesson?.story_nodes?.length || 4;
@@ -402,11 +408,22 @@ export default function Player() {
               <Badge variant="outline" className="text-xs px-2 py-0 capitalize">
                 {{ watercolor: "水彩風", crayon: "蠟筆風", kawaii: "可愛風" }[lesson.metadata.visual_style]}
               </Badge>
-              {lesson.metadata.voice_lang && (
-                <Badge variant="outline" className="text-xs px-2 py-0">
-                  {lesson.metadata.voice_lang === "zh-TW" ? "🇹🇼" : lesson.metadata.voice_lang === "en-US" ? "🇺🇸" : "🇭🇰"}
-                </Badge>
-              )}
+              {/* Language selector for narration */}
+              <select
+                value={voiceLang}
+                onChange={e => {
+                  setVoiceLang(e.target.value);
+                  langRef.current = e.target.value;
+                }}
+                className="text-xs px-2 py-0 border rounded bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
+                aria-label="語音語言選擇"
+                style={{ minWidth: 80 }}
+                data-testid="select-voice-lang"
+              >
+                {LANG_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
               {lesson.metadata.image_count && (
                 <Badge variant="outline" className="text-xs px-2 py-0">🖼️ {lesson.metadata.image_count}張</Badge>
               )}
