@@ -1,3 +1,10 @@
+// ─── Utility: getLangInstruction ─────────────────────────────────────────────
+function getLangInstruction(lang: string): string {
+  if (lang === "en-US") return "All story text and prompts must be in English.";
+  if (lang === "zh-HK") return "All story text and prompts must be in Cantonese (粵語, zh-HK), using Traditional Chinese characters.";
+  // Default: zh-TW
+  return "All story text and prompts must be in Traditional Chinese (繁體中文, zh-TW).";
+}
 /**
  * Vercel Serverless Entry Point
  * This wraps the Express app as a Vercel serverless function.
@@ -91,7 +98,7 @@ function makeCacheKey(p: { age_group: string; topic: string; visual_style: strin
 function makeSeed(key: string) { return parseInt(key.slice(0, 8), 16) % 2147483647; }
 function estimateTextCost(i: number, o: number) { return i * 0.00000015 + o * 0.0000006; }
 
-async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle) {
+async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle, voiceLang: string = "zh-TW") {
   const openai = new AzureOpenAI({
     apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
     endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
@@ -106,7 +113,7 @@ async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: Vis
         role: "system",
         content: `You are an expert early childhood educator creating story scripts for ${ageGroup} year old children.
 Language rules: ${ageC}
-Write avatar_script and button_text in Traditional Chinese (繁體中文). image_prompt must be English.
+${getLangInstruction(voiceLang)}
 Return ONLY valid JSON, no markdown.`,
       },
       {
@@ -229,7 +236,7 @@ app.post("/api/generate", async (req: Request, res: Response) => {
   const start = Date.now();
   try {
     const seed = makeSeed(cacheKey);
-    const { nodes: textNodes, prompts, cost: textCost } = await generateStory(age_group as AgeGroup, topic, visual_style as VisualStyle);
+    const { nodes: textNodes, prompts, cost: textCost } = await generateStory(age_group as AgeGroup, topic, visual_style as VisualStyle, voice_lang);
 
     // Respect user-chosen image count — cap prompts to clampedCount
     const usedPrompts = prompts.slice(0, clampedCount);
@@ -279,7 +286,7 @@ app.post("/api/branch", async (req: Request, res: Response) => {
     const resp = await openai.chat.completions.create({
       model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
       messages: [
-        { role: "system", content: `Early childhood educator. ${AGE_PROMPTS[age_group as AgeGroup]} Write in Traditional Chinese except image_prompt (English). Return JSON only.` },
+        { role: "system", content: `Early childhood educator. ${AGE_PROMPTS[age_group as AgeGroup]} ${getLangInstruction(voice_lang)}. Return JSON only.` },
         { role: "user", content: `Child chose: "${choice_text}". Context: "${parent_script_context}". Topic: ${topic}. Return: {"avatar_script":"...","teacher_prompt":"...","image_prompt":"English, ${STYLE_PROMPTS[style]}, under 40 words"}` },
       ],
       temperature: 0.7, response_format: { type: "json_object" }, max_tokens: 400,
@@ -288,7 +295,7 @@ app.post("/api/branch", async (req: Request, res: Response) => {
     const cacheKey = makeCacheKey({ age_group, topic, visual_style });
     const seed = makeSeed(cacheKey) + node_id.charCodeAt(node_id.length - 1);
     const [imgUrl] = await generateImages([raw.image_prompt || topic], style, seed);
-    const node: StoryNode = { node_id, avatar_script: raw.avatar_script || "故事繼續...", teacher_prompt: raw.teacher_prompt || "請繼續引導小朋友。", image_url: imgUrl, is_branching: false, choices: [] };
+    const node: StoryNode = { node_id, avatar_script: raw.avatar_script || (voice_lang === "en-US" ? "The story continues..." : "故事繼續..."), teacher_prompt: raw.teacher_prompt || (voice_lang === "en-US" ? "Guide the children to reflect on their choice." : "請繼續引導小朋友。"), image_url: imgUrl, is_branching: false, choices: [] };
     if (lesson) {
       const nodes: StoryNode[] = JSON.parse(lesson.storyNodesJson);
       nodes.push(node);

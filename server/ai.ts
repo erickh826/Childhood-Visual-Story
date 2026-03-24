@@ -18,6 +18,16 @@ function getOpenAI() {
   });
 }
 
+
+// ── Language → content instructions ─────────────────────────────────────────
+const CONTENT_LANG_INSTRUCTIONS: Record<string, string> = {
+  "zh-TW": "Write avatar_script, teacher_prompt, and button_text in Traditional Chinese (繁體中文). image_prompt must be in English.",
+  "zh-HK": "Write avatar_script, teacher_prompt, and button_text in Cantonese Chinese (廣東話，使用香港用語). image_prompt must be in English.",
+  "en-US": "Write ALL text fields (avatar_script, teacher_prompt, button_text) in English. image_prompt must also be in English.",
+};
+function getContentLangInstruction(voiceLang?: string) {
+  return CONTENT_LANG_INSTRUCTIONS[voiceLang ?? "zh-TW"] ?? CONTENT_LANG_INSTRUCTIONS["zh-TW"];
+}
 // ── Age → prompt constraints ─────────────────────────────────────────────────
 const AGE_PROMPTS: Record<AgeGroup, string> = {
   "2-3": "Use very simple words (max 2-3 syllables). Very short sentences (5-8 words). Concrete concepts only. No abstract ideas.",
@@ -62,13 +72,14 @@ export async function generateStoryText(
   ageGroup: AgeGroup,
   topic: string,
   visualStyle: VisualStyle,
-  imageCount: number = 3
+  imageCount: number = 3,
+  voiceLang: string = "zh-TW"
 ): Promise<{ nodes: Omit<StoryNode, "image_url">[]; imagePrompts: string[]; costUsd: number }> {
   const ageConstraints = AGE_PROMPTS[ageGroup];
 
   const systemPrompt = `You are an expert early childhood educator creating interactive story scripts for ${ageGroup} year old children.
 Language rules: ${ageConstraints}
-Always write in Traditional Chinese (繁體中文) for avatar_script and button_text, but English for image prompts.
+${getContentLangInstruction(voiceLang)}
 Return ONLY valid JSON, no markdown or explanation.`;
 
   const userPrompt = `Create an interactive story about: "${topic}" with exactly ${Math.max(imageCount, 4)} story nodes (root + branches + ending)
@@ -209,11 +220,13 @@ export async function generateBranchNode(params: {
   parentContext: string;
   nodeId: string;
   seed: number;
+  voiceLang?: string;
 }): Promise<{ node: StoryNode; costUsd: number }> {
-  const { ageGroup, topic, visualStyle, choiceText, parentContext, nodeId, seed } = params;
+  const { ageGroup, topic, visualStyle, choiceText, parentContext, nodeId, seed, voiceLang = "zh-TW" } = params;
   const ageConstraints = AGE_PROMPTS[ageGroup];
+  const langInstruction = getContentLangInstruction(voiceLang);
 
-  const systemPrompt = `You are an expert early childhood educator. Language rules: ${ageConstraints}. Write in Traditional Chinese (繁體中文) except image_prompt which must be English. Return ONLY valid JSON.`;
+  const systemPrompt = `You are an expert early childhood educator. Language rules: ${ageConstraints}. ${langInstruction}. Return ONLY valid JSON.`;
 
   const userPrompt = `Continue the story. The child chose: "${choiceText}"
 Previous story context: "${parentContext}"
@@ -246,8 +259,8 @@ Return this JSON:
 
   const node: StoryNode = {
     node_id: nodeId,
-    avatar_script: raw.avatar_script || "故事繼續...",
-    teacher_prompt: raw.teacher_prompt || "請繼續引導小朋友思考。",
+    avatar_script: raw.avatar_script || (voiceLang === "en-US" ? "The story continues..." : "故事繼續..."),
+    teacher_prompt: raw.teacher_prompt || (voiceLang === "en-US" ? "Please guide the children to think about this." : "請繼續引導小朋友思考。"),
     image_url: imageResult.urls[0],
     is_branching: false,
     choices: [],

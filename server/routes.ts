@@ -49,7 +49,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
       const seed = makeSeed(cacheKey);
 
       // Generate text first (we need image prompts from text output)
-      const { nodes: textNodes, imagePrompts, costUsd: textCost } = await generateStoryText(age_group, topic, visual_style, clampedCount);
+      const { nodes: textNodes, imagePrompts, costUsd: textCost } = await generateStoryText(age_group, topic, visual_style, clampedCount, voice_lang);
 
       // Only generate images for root and branches, not ALL nodes — but for PoC generate main 3 in parallel
       // We generate images for root_01, branch_a, branch_b upfront; ending is the 4th
@@ -124,6 +124,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
     const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
       const seed = makeSeed(cacheKey) + node_id.charCodeAt(node_id.length - 1);
 
+      const voiceLangFromLesson = lesson?.ageGroup ? (storage.getLessonById(lesson_id)?.storyNodesJson ? "zh-TW" : "zh-TW") : "zh-TW";
       const { node, costUsd } = await generateBranchNode({
         ageGroup: age_group as any,
         topic,
@@ -132,6 +133,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
         parentContext: parent_script_context,
         nodeId: node_id,
         seed,
+        voiceLang: req.body.voice_lang || "zh-TW",
       });
 
       // Append new node to cached lesson
