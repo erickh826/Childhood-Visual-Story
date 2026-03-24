@@ -216,54 +216,27 @@ const AVATAR_COMPONENTS: Record<string, (props: { isTalking: boolean }) => JSX.E
   girl: AvatarGirl,
 };
 
-// ── TTS narration — FIX: cleanup on unmount + stable lang ref ─────────────────
-function useNarration(lang: string = "zh-TW") {
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [enabled, setEnabled] = useState(true);
-  const langRef = useRef(lang);
+// ── TTS narration — simple functional approach, no stale closures ────────────
+// speak() receives lang as a direct argument every time — no hooks, no refs.
+function getLangSettings(l: string) {
+  if (l === "en-US") return { rate: 0.9, pitch: 1.1 };
+  if (l === "zh-HK") return { rate: 0.82, pitch: 1.05 };
+  return { rate: 0.85, pitch: 1.15 }; // zh-TW default
+}
 
-  // Keep ref in sync on every render — runs synchronously before effects
-  langRef.current = lang;
+function speakText(text: string, lang: string) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  const { rate, pitch } = getLangSettings(lang);
+  utt.lang = lang;
+  utt.rate = rate;
+  utt.pitch = pitch;
+  window.speechSynthesis.speak(utt);
+}
 
-  // FIX 1: Cancel speech on unmount (leaving the page stops the voice)
-  useEffect(() => {
-    return () => {
-      window.speechSynthesis?.cancel();
-    };
-  }, []);
-
-  const getLangSettings = (l: string) => {
-    if (l === "en-US") return { rate: 0.9, pitch: 1.1 };
-    if (l === "zh-HK") return { rate: 0.82, pitch: 1.05 };
-    return { rate: 0.85, pitch: 1.15 }; // zh-TW
-  };
-
-  // FIX 2: use langRef.current so it reads up-to-date lang at call time
-  const speak = useCallback((text: string) => {
-    if (!enabled || typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    const { rate, pitch } = getLangSettings(langRef.current);
-    utt.lang = langRef.current;
-    utt.rate = rate;
-    utt.pitch = pitch;
-    utt.onstart = () => setIsSpeaking(true);
-    utt.onend = () => setIsSpeaking(false);
-    utt.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utt);
-  }, [enabled]);
-
-  const stop = useCallback(() => {
-    window.speechSynthesis?.cancel();
-    setIsSpeaking(false);
-  }, []);
-
-  const toggle = useCallback(() => {
-    stop();
-    setEnabled((e) => !e);
-  }, [stop]);
-
-  return { speak, stop, isSpeaking, enabled, toggle, langRef };
+function stopSpeech() {
+  window.speechSynthesis?.cancel();
 }
 
 export default function Player() {
@@ -278,12 +251,38 @@ export default function Player() {
   const [showTeacherTip, setShowTeacherTip] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // FIX 2: Store lang in state AND ref so speak() picks it up immediately
+  // Voice: simple state values, passed directly to speakText() each call
   const [voiceLang, setVoiceLang] = useState<string>("zh-TW");
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>("bear");
-
-  const { speak, isSpeaking, enabled, toggle, stop, langRef } = useNarration(voiceLang);
   const nodeRef = useRef<HTMLDivElement>(null);
+
+  // Wrapper: passes current voiceLang directly — no stale closure possible
+  const speak = useCallback((text: string, lang?: string) => {
+    if (!voiceEnabled) return;
+    const useLang = lang ?? voiceLang;
+    setIsSpeaking(true);
+    const utt = new SpeechSynthesisUtterance(text);
+    const { rate, pitch } = getLangSettings(useLang);
+    utt.lang = useLang;
+    utt.rate = rate;
+    utt.pitch = pitch;
+    utt.onend = () => setIsSpeaking(false);
+    utt.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis?.cancel();
+    window.speechSynthesis?.speak(utt);
+  }, [voiceEnabled, voiceLang]);  // re-created when voiceEnabled OR voiceLang changes
+
+  const stop = useCallback(() => {
+    stopSpeech();
+    setIsSpeaking(false);
+  }, []);
+
+  const toggle = useCallback(() => {
+    stop();
+    setVoiceEnabled((e) => !e);
+  }, [stop]);
 
   const { data: lesson, isLoading, isError } = useQuery({
     queryKey: ["/api/lessons", lessonId],
@@ -328,8 +327,10 @@ export default function Player() {
     setImageLoaded(false);
     setShowTeacherTip(false);
     const target = node || getAllNodes().find((n) => n.node_id === nodeId);
-    if (target && enabled) {
-      setTimeout(() => speak(target.avatar_script), 300);
+    if (target && voiceEnabled) {
+      const text = target.avatar_script;
+      const lang = voiceLang;  // captured from closure at call time (current render)
+      setTimeout(() => speakText(text, lang), 300);
     }
     nodeRef.current?.scrollIntoView({ behavior: "smooth" });
   }
@@ -338,17 +339,12 @@ export default function Player() {
   useEffect(() => {
     if (lesson?.story_nodes?.[0]) {
       setVisitedNodes([lesson.story_nodes[0]]);
-      if (lesson.metadata.voice_lang) {
-        // Update ref directly and synchronously so speak() fires with the correct lang
-        langRef.current = lesson.metadata.voice_lang;
-        setVoiceLang(lesson.metadata.voice_lang);
-      }
-      if (lesson.metadata.avatar_style) {
-        setAvatarStyle(lesson.metadata.avatar_style as AvatarStyle);
-      }
-      // Speak after a short delay to allow the browser to initialise voices
+      const lang = lesson.metadata.voice_lang ?? "zh-TW";
+      if (lesson.metadata.voice_lang) setVoiceLang(lang);
+      if (lesson.metadata.avatar_style) setAvatarStyle(lesson.metadata.avatar_style as AvatarStyle);
+      // Pass lang directly — does NOT depend on voiceLang state at all
       const text = lesson.story_nodes[0].avatar_script;
-      setTimeout(() => speak(text), 600);
+      setTimeout(() => speakText(text, lang), 600);
     }
   }, [lesson]);
 
@@ -417,7 +413,7 @@ export default function Player() {
           </div>
 
           <Button variant="ghost" size="icon" onClick={toggle} data-testid="btn-voice-toggle" className="shrink-0" aria-label={enabled ? "關閉語音" : "開啟語音"}>
-            {enabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+            {voiceEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
           </Button>
         </div>
         {/* Progress bar */}
