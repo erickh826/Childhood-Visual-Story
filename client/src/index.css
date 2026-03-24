@@ -1,0 +1,225 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Childhood Visual Story — Warm Playful Palette ───────────────────────── */
+/* Art direction: educational, warm, friendly, suitable for early childhood   */
+/* Primary accent: warm amber/orange; surface: soft cream; typography: rounded */
+
+@layer base {
+  :root {
+    /* Surfaces — warm cream */
+    --background: 38 40% 97%;
+    --foreground: 30 25% 18%;
+    --card: 38 35% 98%;
+    --card-foreground: 30 25% 18%;
+    --popover: 38 35% 98%;
+    --popover-foreground: 30 25% 18%;
+
+    /* Primary — warm amber */
+    --primary: 28 85% 50%;
+    --primary-foreground: 38 40% 97%;
+
+    /* Secondary — soft sage green */
+    --secondary: 140 25% 88%;
+    --secondary-foreground: 140 30% 25%;
+
+    /* Muted */
+    --muted: 38 20% 92%;
+    --muted-foreground: 30 10% 50%;
+
+    /* Accent — sky blue */
+    --accent: 200 70% 88%;
+    --accent-foreground: 200 60% 25%;
+
+    /* Destructive */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* UI chrome */
+    --border: 38 15% 85%;
+    --input: 38 15% 85%;
+    --ring: 28 85% 50%;
+
+    /* Radius — playful rounded corners */
+    --radius: 1rem;
+
+    /* Chart */
+    --chart-1: 28 85% 50%;
+    --chart-2: 140 50% 45%;
+    --chart-3: 200 60% 50%;
+    --chart-4: 300 50% 55%;
+    --chart-5: 60 75% 50%;
+  }
+
+  .dark {
+    --background: 28 20% 10%;
+    --foreground: 38 20% 90%;
+    --card: 28 18% 13%;
+    --card-foreground: 38 20% 90%;
+    --popover: 28 18% 13%;
+    --popover-foreground: 38 20% 90%;
+
+    --primary: 28 80% 60%;
+    --primary-foreground: 28 20% 10%;
+
+    --secondary: 140 20% 20%;
+    --secondary-foreground: 140 25% 75%;
+
+    --muted: 28 15% 18%;
+    --muted-foreground: 30 10% 55%;
+
+    --accent: 200 50% 25%;
+    --accent-foreground: 200 50% 80%;
+
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 28 15% 22%;
+    --input: 28 15% 22%;
+    --ring: 28 80% 60%;
+
+    --chart-1: 28 80% 60%;
+    --chart-2: 140 50% 55%;
+    --chart-3: 200 60% 60%;
+    --chart-4: 300 50% 65%;
+    --chart-5: 60 75% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', 'Nunito', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Chillax', 'Plus Jakarta Sans', sans-serif;
+    @apply font-semibold;
+  }
+}
+
+/* ── Custom animations ─────────────────────────────────────────────────────── */
+@keyframes bounce-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(28 85% 50% / 0.4); }
+  50% { box-shadow: 0 0 0 12px hsl(28 85% 50% / 0); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes avatar-talk {
+  0%, 100% { transform: scaleY(1); }
+  25% { transform: scaleY(0.85); }
+  50% { transform: scaleY(1.05); }
+  75% { transform: scaleY(0.9); }
+}
+
+.animate-bounce-gentle { animation: bounce-gentle 2s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-slide-up { animation: slide-up 0.4s ease-out forwards; }
+.animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+.animate-avatar-talk { animation: avatar-talk 0.15s ease-in-out infinite; }
+
+/* ── Avatar styles ─────────────────────────────────────────────────────────── */
+.avatar-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-bubble {
+  background: white;
+  border-radius: 1.5rem;
+  border: 3px solid hsl(var(--primary));
+  padding: 1rem 1.25rem;
+  position: relative;
+  box-shadow: 0 4px 20px hsl(28 85% 50% / 0.15);
+}
+.avatar-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -16px;
+  left: 24px;
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 16px solid hsl(var(--primary));
+}
+.avatar-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -11px;
+  left: 26px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 13px solid white;
+}
+
+/* ── Story image styles ────────────────────────────────────────────────────── */
+.story-image {
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 8px 32px hsl(28 30% 20% / 0.15);
+  transition: transform 0.3s ease;
+}
+.story-image:hover {
+  transform: scale(1.01);
+}
+
+/* ── Choice buttons ────────────────────────────────────────────────────────── */
+.choice-btn {
+  border-radius: 1rem;
+  padding: 0.875rem 1.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+}
+.choice-btn:hover {
+  transform: scale(1.04) translateY(-2px);
+  box-shadow: 0 8px 24px hsl(28 85% 50% / 0.25);
+}
+.choice-btn:active {
+  transform: scale(0.97);
+}
+
+/* ── Progress dots ─────────────────────────────────────────────────────────── */
+.progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+.progress-dot.active {
+  width: 24px;
+  border-radius: 5px;
+}
+
+/* ── Skeleton loading ──────────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, hsl(38 20% 88%) 25%, hsl(38 20% 94%) 50%, hsl(38 20% 88%) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
