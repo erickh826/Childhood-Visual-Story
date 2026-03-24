@@ -109,6 +109,14 @@ function safeParseLLMJson(content: string | null | undefined): Record<string, an
   }
 }
 
+
+function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(timer));
+}
+
 function createOpenAIClient(): AzureOpenAI {
   return new AzureOpenAI({
     apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
@@ -204,7 +212,11 @@ async function generateImages(prompts: string[], style: VisualStyle, seed: numbe
   const suffix = STYLE_PROMPTS[style];
   return Promise.all(prompts.map(async (p) => {
     try {
+<<<<<<< HEAD
       const r = await globalThis.fetch("https://fal.run/fal-ai/flux/schnell", {
+=======
+      const r = await fetchWithTimeout("https://fal.run/fal-ai/flux/schnell", {
+>>>>>>> bcdf1b9c3781f6f1ec9bd45d9d382ab65500bb5d
         method: "POST",
         headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -216,7 +228,7 @@ async function generateImages(prompts: string[], style: VisualStyle, seed: numbe
           num_images: 1,
           enable_safety_checker: true,
         }),
-      });
+      }, 25000);  // 25s timeout per image
       const d: any = await r.json();
       return d.images?.[0]?.url || `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`;
     } catch {
@@ -405,6 +417,11 @@ app.post("/api/branch", async (req: Request, res: express.Response) => {
     console.error(e);
     res.status(500).json({ error: "Branch failed", message: e.message });
   }
+});
+
+// GET /api/health — quick liveness check
+app.get("/api/health", (_req: Request, res: Response) => {
+  res.json({ status: "ok", ts: Date.now() });
 });
 
 // GET /api/lessons
