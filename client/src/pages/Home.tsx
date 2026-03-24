@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import type { LessonPayload, AgeGroup, VisualStyle, VoiceLang } from "@shared/schema";
-import { AGE_GROUPS, VISUAL_STYLES, VOICE_LANGS, VOICE_LANG_LABELS } from "@shared/schema";
+import type { LessonPayload, AgeGroup, VisualStyle, VoiceLang, AvatarStyle } from "@shared/schema";
+import { AGE_GROUPS, VISUAL_STYLES, VOICE_LANGS, VOICE_LANG_LABELS, AVATAR_STYLES, AVATAR_LABELS } from "@shared/schema";
 import { BookOpen, Sparkles, Clock, History, Images, Mic } from "lucide-react";
 import { Link } from "wouter";
 
@@ -37,6 +37,7 @@ export default function Home() {
   const [visualStyle, setVisualStyle] = useState<VisualStyle>("watercolor");
   const [imageCount, setImageCount] = useState<number>(3);
   const [voiceLang, setVoiceLang] = useState<VoiceLang>("zh-TW");
+  const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>("bear");
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -46,6 +47,7 @@ export default function Home() {
         visual_style: visualStyle,
         image_count: imageCount,
         voice_lang: voiceLang,
+        avatar_style: avatarStyle,
       });
       return res.json() as Promise<LessonPayload>;
     },
@@ -234,6 +236,38 @@ export default function Home() {
                       }`}
                   >
                     {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Avatar character */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                🎭 說故事角色
+              </Label>
+              <div className="grid grid-cols-5 gap-2">
+                {AVATAR_STYLES.map((style) => (
+                  <button
+                    key={style}
+                    data-testid={`btn-avatar-${style}`}
+                    onClick={() => setAvatarStyle(style)}
+                    title={AVATAR_LABELS[style]}
+                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border-2 transition-all duration-200 cursor-pointer
+                      ${avatarStyle === style
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border bg-background hover:border-primary/50 hover:bg-primary/5"
+                      }`}
+                  >
+                    <span className="text-2xl">{
+                      style === "bear" ? "🐻" :
+                      style === "cat" ? "🐱" :
+                      style === "robot" ? "🤖" :
+                      style === "bunny" ? "🐰" : "👧"
+                    }</span>
+                    <span className={`text-xs font-medium leading-tight text-center ${avatarStyle === style ? "text-primary" : "text-muted-foreground"}`}>
+                      {AVATAR_LABELS[style].split(" ")[0]}
+                    </span>
                   </button>
                 ))}
               </div>

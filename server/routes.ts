@@ -25,7 +25,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid request", details: parsed.error.issues });
     }
-    const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-TW" } = parsed.data;
+    const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-TW", avatar_style = "bear" } = parsed.data;
     const clampedCount = Math.min(8, Math.max(1, image_count));
     const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
 
@@ -34,7 +34,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
     if (cached) {
       const payload: LessonPayload = {
         lesson_id: cached.id,
-        metadata: { age_group: cached.ageGroup as any, topic: cached.topic, visual_style: cached.visualStyle as any, image_count: clampedCount, voice_lang: voice_lang as any },
+        metadata: { age_group: cached.ageGroup as any, topic: cached.topic, visual_style: cached.visualStyle as any, image_count: clampedCount, voice_lang: voice_lang as any, avatar_style: avatar_style as any },
         story_nodes: JSON.parse(cached.storyNodesJson),
         cached: true,
         generation_ms: cached.generationMs || 0,
@@ -85,7 +85,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
 
       const payload: LessonPayload = {
         lesson_id: lessonId,
-        metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang: voice_lang as any },
+        metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang: voice_lang as any, avatar_style: avatar_style as any },
         story_nodes: storyNodes,
         cached: false,
         generation_ms: genMs,

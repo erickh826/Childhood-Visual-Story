@@ -73,7 +73,16 @@ const STYLE_PROMPTS: Record<VisualStyle, string> = {
   crayon:     "crayon drawing, bright primary colors, slightly rough texture, children's artwork style, simple shapes",
   kawaii:     "kawaii cute style, pastel colors, big round eyes, simple cheerful expressions, Japanese children's illustration",
 };
-const NEGATIVE = "3D render, photorealistic, dark, scary, violent, complex background, adult, horror, nsfw";
+const NEGATIVE = [
+  "realistic", "semi-realistic", "photorealistic", "3D render", "3D CGI",
+  "detailed textures", "hyper-detailed", "HDR photo",
+  "dark colors", "dark background", "low lighting", "gloomy", "monochrome",
+  "distorted face", "extra limbs", "deformed hands", "missing fingers",
+  "bad anatomy", "disfigured", "mutation", "ugly",
+  "inconsistent style", "mixed styles", "messy lines", "sketch",
+  "complex background", "busy background", "cluttered",
+  "adult", "nsfw", "violence", "horror", "scary", "blood",
+].join(", ");
 
 function makeCacheKey(p: { age_group: string; topic: string; visual_style: string; image_count?: number }) {
   const count = p.image_count ?? 3;
@@ -168,10 +177,22 @@ async function generateImages(prompts: string[], style: VisualStyle, seed: numbe
   const suffix = STYLE_PROMPTS[style];
   return Promise.all(prompts.map(async (p) => {
     try {
-      const r = await fetch("https://fal.run/fal-ai/flux/schnell", {
+      const r = await fetch("https://fal.run/fal-ai/flux-lora", {
         method: "POST",
         headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: `${p}, ${suffix}`, negative_prompt: NEGATIVE, image_size: "square_hd", num_inference_steps: 4, seed, num_images: 1, enable_safety_checker: true }),
+        body: JSON.stringify({
+          prompt: `${p}, ${suffix}`,
+          negative_prompt: NEGATIVE,
+          image_size: "square_hd",
+          num_inference_steps: 8,
+          guidance_scale: 3.5,
+          seed,
+          num_images: 1,
+          enable_safety_checker: true,
+          loras: suffix.includes("watercolor") || suffix.includes("kawaii")
+            ? [{ path: "https://huggingface.co/Shakker-Labs/FLUX.1-dev-LoRA-Children-Simple-Sketch/resolve/main/FLUX.1-dev-LoRA-Children-Simple-Sketch.safetensors", scale: 0.65 }]
+            : [{ path: "https://huggingface.co/alvdansen/frosting_lane_flux/resolve/main/flux_dev_frostinglane_araminta_k.safetensors", scale: 0.65 }],
+        }),
       });
       const d: any = await r.json();
       return d.images?.[0]?.url || `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`;
@@ -194,7 +215,7 @@ app.use((_req, res, next) => {
 
 // POST /api/generate
 app.post("/api/generate", async (req: Request, res: Response) => {
-  const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-TW" } = req.body;
+  const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-TW", avatar_style = "bear" } = req.body;
   if (!age_group || !topic || !visual_style) return res.status(400).json({ error: "Missing fields" });
   const clampedCount = Math.min(8, Math.max(1, Number(image_count)));
   const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
@@ -203,7 +224,7 @@ app.post("/api/generate", async (req: Request, res: Response) => {
   if (cached) {
     return res.json({
       lesson_id: cached.id,
-      metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang },
+      metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang, avatar_style },
       story_nodes: JSON.parse(cached.storyNodesJson), cached: true,
       generation_ms: cached.generationMs, total_cost_usd: cached.totalCostUsd,
     });
@@ -233,7 +254,7 @@ app.post("/api/generate", async (req: Request, res: Response) => {
     storage.save({ id, cacheKey, ageGroup: age_group, topic, visualStyle: visual_style, storyNodesJson: JSON.stringify(storyNodes), totalCostUsd: totalCost, generationMs: genMs });
     return res.json({
       lesson_id: id,
-      metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang },
+      metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang, avatar_style },
       story_nodes: storyNodes, cached: false, generation_ms: genMs, total_cost_usd: totalCost,
     });
   } catch (e: any) {

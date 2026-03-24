@@ -32,7 +32,22 @@ const STYLE_PROMPTS: Record<VisualStyle, string> = {
   kawaii: "kawaii cute style, pastel colors, big round eyes, simple cheerful expressions, Japanese children's illustration",
 };
 
-const NEGATIVE_PROMPT = "3D render, photorealistic, dark, scary, violent, complex background, adult, horror, nsfw";
+const NEGATIVE_PROMPT = [
+  // Style issues
+  "realistic", "semi-realistic", "photorealistic", "3D render", "3D CGI",
+  "detailed textures", "hyper-detailed", "HDR photo",
+  // Color/mood issues
+  "dark colors", "dark background", "low lighting", "gloomy", "monochrome",
+  // Anatomy issues
+  "distorted face", "extra limbs", "deformed hands", "missing fingers",
+  "bad anatomy", "disfigured", "mutation", "ugly",
+  // Style inconsistency
+  "inconsistent style", "mixed styles", "messy lines", "sketch",
+  // Background complexity
+  "complex background", "busy background", "cluttered",
+  // Prohibited content
+  "adult", "nsfw", "violence", "horror", "scary", "blood",
+].join(", ");
 
 // Rough cost tracking (GPT-4o-mini pricing: $0.15/1M input, $0.60/1M output)
 function estimateTextCost(inputTokens: number, outputTokens: number): number {
@@ -151,7 +166,7 @@ export async function generateImages(
   const imageJobs = prompts.map(async (prompt) => {
     const fullPrompt = `${prompt}, ${styleSuffix}`;
     try {
-      const res = await fetch("https://fal.run/fal-ai/flux/schnell", {
+      const res = await fetch("https://fal.run/fal-ai/flux-lora", {
         method: "POST",
         headers: {
           Authorization: `Key ${process.env.FAL_API_KEY}`,
@@ -161,10 +176,17 @@ export async function generateImages(
           prompt: fullPrompt,
           negative_prompt: NEGATIVE_PROMPT,
           image_size: "square_hd",
-          num_inference_steps: 4,
+          num_inference_steps: 8,
+          guidance_scale: 3.5,
           seed,
           num_images: 1,
           enable_safety_checker: true,
+          // Style LoRA per visual style for consistency
+          loras: styleSuffix.includes("watercolor")
+            ? [{ path: "https://huggingface.co/Shakker-Labs/FLUX.1-dev-LoRA-Children-Simple-Sketch/resolve/main/FLUX.1-dev-LoRA-Children-Simple-Sketch.safetensors", scale: 0.7 }]
+            : styleSuffix.includes("crayon")
+            ? [{ path: "https://huggingface.co/alvdansen/frosting_lane_flux/resolve/main/flux_dev_frostinglane_araminta_k.safetensors", scale: 0.65 }]
+            : [{ path: "https://huggingface.co/Shakker-Labs/FLUX.1-dev-LoRA-Children-Simple-Sketch/resolve/main/FLUX.1-dev-LoRA-Children-Simple-Sketch.safetensors", scale: 0.6 }],
         }),
       });
       if (!res.ok) {

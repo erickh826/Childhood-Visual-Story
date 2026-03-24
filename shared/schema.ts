@@ -52,12 +52,23 @@ export interface LessonPayload {
     visual_style: VisualStyle;
     image_count?: number;
     voice_lang?: VoiceLang;
+    avatar_style?: AvatarStyle;
   };
   story_nodes: StoryNode[];
   cached: boolean;
   generation_ms?: number;
   total_cost_usd?: number;
 }
+
+export const AVATAR_STYLES = ["bear", "cat", "robot", "bunny", "girl"] as const;
+export type AvatarStyle = (typeof AVATAR_STYLES)[number];
+export const AVATAR_LABELS: Record<AvatarStyle, string> = {
+  bear: "小熊 🐻",
+  cat: "貓咪 🐱",
+  robot: "機器人 🤖",
+  bunny: "兔兔 🐰",
+  girl: "小女孩 👧",
+};
 
 export const VOICE_LANGS = ["zh-TW", "en-US", "zh-HK"] as const;
 export type VoiceLang = (typeof VOICE_LANGS)[number];
@@ -75,6 +86,7 @@ export const generateRequestSchema = z.object({
   visual_style: z.enum(VISUAL_STYLES),
   image_count: z.number().int().min(1).max(8).default(3),
   voice_lang: z.enum(VOICE_LANGS).default("zh-TW"),
+  avatar_style: z.enum(AVATAR_STYLES).default("bear"),
 });
 export type GenerateRequest = z.infer<typeof generateRequestSchema>;
 
