@@ -2,22 +2,17 @@
 function getLangInstruction(lang: string): string {
   if (lang === "en-US") return "All story text and prompts must be in English.";
   if (lang === "zh-HK") return "All story text and prompts must be in Cantonese (粵語, zh-HK), using Traditional Chinese characters.";
-  // Default: zh-TW
   return "All story text and prompts must be in Traditional Chinese (繁體中文, zh-TW).";
 }
-/**
- * Vercel Serverless Entry Point
- * This wraps the Express app as a Vercel serverless function.
- *
- * NOTE: better-sqlite3 (local file DB) is replaced with in-memory storage
- * on Vercel since the filesystem is read-only in serverless environments.
- * For production persistence, replace with PlanetScale / Neon / Supabase.
- */
-import express, { type Request, Response, NextFunction } from "express";
-import { createServer } from "http";
+
+import express, { type Request, type NextFunction } from "express";
 import { createHash } from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { AzureOpenAI } from "openai";
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+const FAL_COST_PER_IMAGE_USD = 0.001;
+const MAX_TOPIC_LENGTH = 200;
 
 // ─── Inline in-memory storage (replaces SQLite for Vercel) ──────────────────
 interface LessonRecord {
@@ -32,8 +27,8 @@ interface LessonRecord {
   createdAt: number;
 }
 
-const lessonStore = new Map<string, LessonRecord>(); // id → record
-const cacheIndex = new Map<string, string>();         // cacheKey → id
+const lessonStore = new Map<string, LessonRecord>();
+const cacheIndex = new Map<string, string>();
 
 const storage = {
   getByCacheKey: (key: string) => {
@@ -41,17 +36,15 @@ const storage = {
     return id ? lessonStore.get(id) : undefined;
   },
   getById: (id: string) => lessonStore.get(id),
-  save: (rec: Omit<LessonRecord, "createdAt">): LessonRecord => {
+  save: (rec: LessonRecord): LessonRecord => {
     const existing = cacheIndex.get(rec.cacheKey);
     if (existing) {
-      const updated = { ...lessonStore.get(existing)!, ...rec };
-      lessonStore.set(existing, updated);
-      return updated;
+      lessonStore.set(existing, rec);
+      return rec;
     }
-    const full: LessonRecord = { ...rec, createdAt: Date.now() };
-    lessonStore.set(rec.id, full);
+    lessonStore.set(rec.id, rec);
     cacheIndex.set(rec.cacheKey, rec.id);
-    return full;
+    return rec;
   },
   list: () => Array.from(lessonStore.values()),
 };
@@ -91,21 +84,44 @@ const NEGATIVE = [
   "adult", "nsfw", "violence", "horror", "scary", "blood",
 ].join(", ");
 
+function sanitizeTopic(topic: string): string {
+  return topic.trim().slice(0, MAX_TOPIC_LENGTH).replace(/[\r\n]+/g, " ");
+}
+
 function makeCacheKey(p: { age_group: string; topic: string; visual_style: string; image_count?: number }) {
   const count = p.image_count ?? 3;
   return createHash("md5").update(`${p.age_group}|${p.topic.toLowerCase().trim()}|${p.visual_style}|${count}`).digest("hex");
 }
-function makeSeed(key: string) { return parseInt(key.slice(0, 8), 16) % 2147483647; }
-function estimateTextCost(i: number, o: number) { return i * 0.00000015 + o * 0.0000006; }
 
-async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle, voiceLang: string = "zh-TW") {
-  const openai = new AzureOpenAI({
+function makeSeed(key: string) {
+  return (parseInt(key.slice(0, 8), 16) % 2147483646) + 1;
+}
+
+function estimateTextCost(i: number, o: number) {
+  return i * 0.00000015 + o * 0.0000006;
+}
+
+function safeParseLLMJson(content: string | null | undefined): Record<string, any> {
+  try {
+    return JSON.parse(content || "{}");
+  } catch {
+    throw new Error("LLM returned invalid JSON");
+  }
+}
+
+function createOpenAIClient(): AzureOpenAI {
+  return new AzureOpenAI({
     apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
     endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
     apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
     deployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
   });
+}
+
+async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle, voiceLang: string = "zh-TW") {
+  const openai = createOpenAIClient();
   const ageC = AGE_PROMPTS[ageGroup];
+  const safeTopic = sanitizeTopic(topic);
   const resp = await openai.chat.completions.create({
     model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
     messages: [
@@ -118,7 +134,7 @@ Return ONLY valid JSON, no markdown.`,
       },
       {
         role: "user",
-        content: `Create an interactive story about: "${topic}", visual style: ${visualStyle}.
+        content: `Create an interactive story about: "${safeTopic}", visual style: ${visualStyle}.
 Return this exact JSON:
 {
   "nodes": [
@@ -166,14 +182,18 @@ Rules: root_01 must have is_branching:true with 2 choices. Write 2-4 sentences p
     response_format: { type: "json_object" },
     max_tokens: 1500,
   });
-  const raw = JSON.parse(resp.choices[0].message.content || "{}");
+
+  const raw = safeParseLLMJson(resp.choices[0].message.content);
   const nodes = (raw.nodes || []) as any[];
-  const prompts = nodes.map((n: any) => n.image_prompt || topic);
+  const prompts = nodes.map((n: any) => n.image_prompt || safeTopic);
   const cost = estimateTextCost(resp.usage?.prompt_tokens || 800, resp.usage?.completion_tokens || 500);
   return {
     nodes: nodes.map((n: any) => ({
-      node_id: n.node_id, avatar_script: n.avatar_script, teacher_prompt: n.teacher_prompt,
-      is_branching: n.is_branching, choices: n.choices || [],
+      node_id: n.node_id,
+      avatar_script: n.avatar_script,
+      teacher_prompt: n.teacher_prompt,
+      is_branching: n.is_branching,
+      choices: n.choices || [],
     })),
     prompts,
     cost,
@@ -184,7 +204,7 @@ async function generateImages(prompts: string[], style: VisualStyle, seed: numbe
   const suffix = STYLE_PROMPTS[style];
   return Promise.all(prompts.map(async (p) => {
     try {
-      const r = await fetch("https://fal.run/fal-ai/flux/schnell", {
+      const r = await globalThis.fetch("https://fal.run/fal-ai/flux/schnell", {
         method: "POST",
         headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -199,7 +219,9 @@ async function generateImages(prompts: string[], style: VisualStyle, seed: numbe
       });
       const d: any = await r.json();
       return d.images?.[0]?.url || `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`;
-    } catch { return `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`; }
+    } catch {
+      return `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`;
+    }
   }));
 }
 
@@ -208,42 +230,68 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// CORS for Vercel
-app.use((_req, res, next) => {
+// CORS
+app.use((_req: Request, res: express.Response, next: NextFunction) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   next();
 });
 
+app.options("*", (_req: Request, res: express.Response) => {
+  res.sendStatus(204);
+});
+
 // POST /api/generate
-app.post("/api/generate", async (req: Request, res: Response) => {
-  const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-TW", avatar_style = "bear" } = req.body;
-  if (!age_group || !topic || !visual_style) return res.status(400).json({ error: "Missing fields" });
+app.post("/api/generate", async (req: Request, res: express.Response) => {
+  const {
+    age_group,
+    topic,
+    visual_style,
+    image_count = 3,
+    voice_lang = "zh-TW",
+    avatar_style = "bear",
+  } = req.body;
+
+  if (!age_group || !topic || !visual_style) {
+    res.status(400).json({ error: "Missing fields" });
+    return;
+  }
+
+  const safeTopic = sanitizeTopic(topic);
   const clampedCount = Math.min(8, Math.max(1, Number(image_count)));
-  const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
+  const cacheKey = makeCacheKey({ age_group, topic: safeTopic, visual_style, image_count: clampedCount });
 
   const cached = storage.getByCacheKey(cacheKey);
   if (cached) {
-    return res.json({
+    res.json({
       lesson_id: cached.id,
-      metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang, avatar_style },
-      story_nodes: JSON.parse(cached.storyNodesJson), cached: true,
-      generation_ms: cached.generationMs, total_cost_usd: cached.totalCostUsd,
+      metadata: { age_group, topic: safeTopic, visual_style, image_count: clampedCount, voice_lang, avatar_style },
+      story_nodes: JSON.parse(cached.storyNodesJson),
+      cached: true,
+      generation_ms: cached.generationMs,
+      total_cost_usd: cached.totalCostUsd,
     });
+    return;
   }
 
   const start = Date.now();
   try {
     const seed = makeSeed(cacheKey);
-    const { nodes: textNodes, prompts, cost: textCost } = await generateStory(age_group as AgeGroup, topic, visual_style as VisualStyle, voice_lang);
+    const { nodes: textNodes, prompts, cost: textCost } = await generateStory(
+      age_group as AgeGroup,
+      safeTopic,
+      visual_style as VisualStyle,
+      voice_lang,
+    );
 
-    // Respect user-chosen image count — cap prompts to clampedCount
     const usedPrompts = prompts.slice(0, clampedCount);
-    const batchSize = 4; // parallel batch to stay within rate limits
+    const batchSize = 4;
     const [firstUrls, secondUrls] = await Promise.all([
       generateImages(usedPrompts.slice(0, batchSize), visual_style as VisualStyle, seed),
-      usedPrompts.length > batchSize ? generateImages(usedPrompts.slice(batchSize), visual_style as VisualStyle, seed + 1) : Promise.resolve([] as string[]),
+      usedPrompts.length > batchSize
+        ? generateImages(usedPrompts.slice(batchSize), visual_style as VisualStyle, seed + 1)
+        : Promise.resolve([] as string[]),
     ]);
     const allUrls = [...firstUrls, ...secondUrls];
 
@@ -251,73 +299,148 @@ app.post("/api/generate", async (req: Request, res: Response) => {
       ...n,
       image_url: allUrls[i] || `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`,
     }));
-    const totalCost = textCost + (allUrls.length * 0.001);
+
+    const totalCost = textCost + (allUrls.length * FAL_COST_PER_IMAGE_USD);
     const genMs = Date.now() - start;
     const id = uuidv4();
-    storage.save({ id, cacheKey, ageGroup: age_group, topic, visualStyle: visual_style, storyNodesJson: JSON.stringify(storyNodes), totalCostUsd: totalCost, generationMs: genMs });
-    return res.json({
+
+    storage.save({
+      id,
+      cacheKey,
+      ageGroup: age_group,
+      topic: safeTopic,
+      visualStyle: visual_style,
+      storyNodesJson: JSON.stringify(storyNodes),
+      totalCostUsd: totalCost,
+      generationMs: genMs,
+      createdAt: Date.now(),
+    });
+
+    res.json({
       lesson_id: id,
-      metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang, avatar_style },
-      story_nodes: storyNodes, cached: false, generation_ms: genMs, total_cost_usd: totalCost,
+      metadata: { age_group, topic: safeTopic, visual_style, image_count: clampedCount, voice_lang, avatar_style },
+      story_nodes: storyNodes,
+      cached: false,
+      generation_ms: genMs,
+      total_cost_usd: totalCost,
     });
   } catch (e: any) {
     console.error(e);
-    return res.status(500).json({ error: "Generation failed", message: e.message });
+    res.status(500).json({ error: "Generation failed", message: e.message });
   }
 });
 
 // POST /api/branch
-app.post("/api/branch", async (req: Request, res: Response) => {
-  const { lesson_id, node_id, age_group, topic, visual_style, choice_text, parent_script_context } = req.body;
+app.post("/api/branch", async (req: Request, res: express.Response) => {
+  const {
+    lesson_id,
+    node_id,
+    age_group,
+    topic,
+    visual_style,
+    choice_text,
+    parent_script_context,
+    voice_lang = "zh-TW",
+  } = req.body;
+
   const lesson = storage.getById(lesson_id);
   if (lesson) {
     const nodes: StoryNode[] = JSON.parse(lesson.storyNodesJson);
-    const existing = nodes.find(n => n.node_id === node_id);
-    if (existing) return res.json({ node: existing, cached: true });
+    const existing = nodes.find((n) => n.node_id === node_id);
+    if (existing) {
+      res.json({ node: existing, cached: true });
+      return;
+    }
   }
+
   try {
-    const openai = new AzureOpenAI({
-    apiKey: process.env.AZURE_OPENAI_API_KEY || "placeholder",
-    endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com",
-    apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
-    deployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
-  });
+    const openai = createOpenAIClient();
     const style = visual_style as VisualStyle;
+    const safeTopic = sanitizeTopic(topic);
+    const safeChoice = sanitizeTopic(choice_text);
+    const safeContext = (parent_script_context || "").trim().slice(0, 500);
+
     const resp = await openai.chat.completions.create({
       model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
       messages: [
-        { role: "system", content: `Early childhood educator. ${AGE_PROMPTS[age_group as AgeGroup]} ${getLangInstruction(voice_lang)}. Return JSON only.` },
-        { role: "user", content: `Child chose: "${choice_text}". Context: "${parent_script_context}". Topic: ${topic}. Return: {"avatar_script":"...","teacher_prompt":"...","image_prompt":"English, ${STYLE_PROMPTS[style]}, under 40 words"}` },
+        {
+          role: "system",
+          content: `Early childhood educator. ${AGE_PROMPTS[age_group as AgeGroup]} ${getLangInstruction(voice_lang)}. Return JSON only.`,
+        },
+        {
+          role: "user",
+          content: `Child chose: "${safeChoice}". Context: "${safeContext}". Topic: ${safeTopic}. Return: {"avatar_script":"...","teacher_prompt":"...","image_prompt":"English, ${STYLE_PROMPTS[style]}, under 40 words"}`,
+        },
       ],
-      temperature: 0.7, response_format: { type: "json_object" }, max_tokens: 400,
+      temperature: 0.7,
+      response_format: { type: "json_object" },
+      max_tokens: 400,
     });
-    const raw = JSON.parse(resp.choices[0].message.content || "{}");
-    const cacheKey = makeCacheKey({ age_group, topic, visual_style });
+
+    const raw = safeParseLLMJson(resp.choices[0].message.content);
+    const cacheKey = makeCacheKey({ age_group, topic: safeTopic, visual_style });
     const seed = makeSeed(cacheKey) + node_id.charCodeAt(node_id.length - 1);
-    const [imgUrl] = await generateImages([raw.image_prompt || topic], style, seed);
-    const node: StoryNode = { node_id, avatar_script: raw.avatar_script || (voice_lang === "en-US" ? "The story continues..." : "故事繼續..."), teacher_prompt: raw.teacher_prompt || (voice_lang === "en-US" ? "Guide the children to reflect on their choice." : "請繼續引導小朋友。"), image_url: imgUrl, is_branching: false, choices: [] };
+    const [imgUrl] = await generateImages([raw.image_prompt || safeTopic], style, seed);
+
+    const node: StoryNode = {
+      node_id,
+      avatar_script: raw.avatar_script || (voice_lang === "en-US" ? "The story continues..." : "故事繼續..."),
+      teacher_prompt: raw.teacher_prompt || (voice_lang === "en-US" ? "Guide the children to reflect on their choice." : "請繼續引導小朋友。"),
+      image_url: imgUrl,
+      is_branching: false,
+      choices: [],
+    };
+
     if (lesson) {
       const nodes: StoryNode[] = JSON.parse(lesson.storyNodesJson);
       nodes.push(node);
-      storage.save({ ...lesson, storyNodesJson: JSON.stringify(nodes) });
+      storage.save({
+        ...lesson,
+        storyNodesJson: JSON.stringify(nodes),
+      });
     }
-    return res.json({ node, cached: false });
+
+    res.json({ node, cached: false });
   } catch (e: any) {
-    return res.status(500).json({ error: "Branch failed", message: e.message });
+    console.error(e);
+    res.status(500).json({ error: "Branch failed", message: e.message });
   }
 });
 
 // GET /api/lessons
-app.get("/api/lessons", (_req: Request, res: Response) => {
-  const all = storage.list().map(l => ({ id: l.id, ageGroup: l.ageGroup, topic: l.topic, visualStyle: l.visualStyle, createdAt: l.createdAt, generationMs: l.generationMs, totalCostUsd: l.totalCostUsd }));
+app.get("/api/lessons", (_req: Request, res: express.Response) => {
+  const all = storage.list().map((l) => ({
+    id: l.id,
+    ageGroup: l.ageGroup,
+    topic: l.topic,
+    visualStyle: l.visualStyle,
+    createdAt: l.createdAt,
+    generationMs: l.generationMs,
+    totalCostUsd: l.totalCostUsd,
+  }));
   res.json(all);
 });
 
 // GET /api/lessons/:id
-app.get("/api/lessons/:id", (req: Request, res: Response) => {
-  const lesson = storage.getById(req.params.id);
-  if (!lesson) return res.status(404).json({ error: "Not found" });
-  res.json({ lesson_id: lesson.id, metadata: { age_group: lesson.ageGroup, topic: lesson.topic, visual_style: lesson.visualStyle }, story_nodes: JSON.parse(lesson.storyNodesJson), cached: true, generation_ms: lesson.generationMs, total_cost_usd: lesson.totalCostUsd });
+app.get("/api/lessons/:id", (req: Request, res: express.Response) => {
+  const id = String(req.params.id);
+  const lesson = storage.getById(id);
+  if (!lesson) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json({
+    lesson_id: lesson.id,
+    metadata: {
+      age_group: lesson.ageGroup,
+      topic: lesson.topic,
+      visual_style: lesson.visualStyle,
+    },
+    story_nodes: JSON.parse(lesson.storyNodesJson),
+    cached: true,
+    generation_ms: lesson.generationMs,
+    total_cost_usd: lesson.totalCostUsd,
+  });
 });
 
 export default app;
