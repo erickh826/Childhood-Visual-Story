@@ -212,11 +212,7 @@ async function generateImages(prompts: string[], style: VisualStyle, seed: numbe
   const suffix = STYLE_PROMPTS[style];
   return Promise.all(prompts.map(async (p) => {
     try {
-<<<<<<< HEAD
       const r = await globalThis.fetch("https://fal.run/fal-ai/flux/schnell", {
-=======
-      const r = await fetchWithTimeout("https://fal.run/fal-ai/flux/schnell", {
->>>>>>> bcdf1b9c3781f6f1ec9bd45d9d382ab65500bb5d
         method: "POST",
         headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
