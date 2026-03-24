@@ -75,8 +75,9 @@ const STYLE_PROMPTS: Record<VisualStyle, string> = {
 };
 const NEGATIVE = "3D render, photorealistic, dark, scary, violent, complex background, adult, horror, nsfw";
 
-function makeCacheKey(p: { age_group: string; topic: string; visual_style: string }) {
-  return createHash("md5").update(`${p.age_group}|${p.topic.toLowerCase().trim()}|${p.visual_style}`).digest("hex");
+function makeCacheKey(p: { age_group: string; topic: string; visual_style: string; image_count?: number }) {
+  const count = p.image_count ?? 3;
+  return createHash("md5").update(`${p.age_group}|${p.topic.toLowerCase().trim()}|${p.visual_style}|${count}`).digest("hex");
 }
 function makeSeed(key: string) { return parseInt(key.slice(0, 8), 16) % 2147483647; }
 function estimateTextCost(i: number, o: number) { return i * 0.00000015 + o * 0.0000006; }
@@ -193,14 +194,16 @@ app.use((_req, res, next) => {
 
 // POST /api/generate
 app.post("/api/generate", async (req: Request, res: Response) => {
-  const { age_group, topic, visual_style } = req.body;
+  const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-TW" } = req.body;
   if (!age_group || !topic || !visual_style) return res.status(400).json({ error: "Missing fields" });
-  const cacheKey = makeCacheKey({ age_group, topic, visual_style });
+  const clampedCount = Math.min(8, Math.max(1, Number(image_count)));
+  const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
 
   const cached = storage.getByCacheKey(cacheKey);
   if (cached) {
     return res.json({
-      lesson_id: cached.id, metadata: { age_group, topic, visual_style },
+      lesson_id: cached.id,
+      metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang },
       story_nodes: JSON.parse(cached.storyNodesJson), cached: true,
       generation_ms: cached.generationMs, total_cost_usd: cached.totalCostUsd,
     });
@@ -210,17 +213,29 @@ app.post("/api/generate", async (req: Request, res: Response) => {
   try {
     const seed = makeSeed(cacheKey);
     const { nodes: textNodes, prompts, cost: textCost } = await generateStory(age_group as AgeGroup, topic, visual_style as VisualStyle);
-    const [mainUrls, extraUrls] = await Promise.all([
-      generateImages(prompts.slice(0, 3), visual_style as VisualStyle, seed),
-      prompts.length > 3 ? generateImages(prompts.slice(3), visual_style as VisualStyle, seed + 1) : Promise.resolve([] as string[]),
+
+    // Respect user-chosen image count — cap prompts to clampedCount
+    const usedPrompts = prompts.slice(0, clampedCount);
+    const batchSize = 4; // parallel batch to stay within rate limits
+    const [firstUrls, secondUrls] = await Promise.all([
+      generateImages(usedPrompts.slice(0, batchSize), visual_style as VisualStyle, seed),
+      usedPrompts.length > batchSize ? generateImages(usedPrompts.slice(batchSize), visual_style as VisualStyle, seed + 1) : Promise.resolve([] as string[]),
     ]);
-    const allUrls = [...mainUrls, ...extraUrls];
-    const storyNodes: StoryNode[] = textNodes.map((n, i) => ({ ...n, image_url: allUrls[i] || `https://placehold.co/512x512/FFE4B5/8B4513?text=Image` }));
+    const allUrls = [...firstUrls, ...secondUrls];
+
+    const storyNodes: StoryNode[] = textNodes.map((n, i) => ({
+      ...n,
+      image_url: allUrls[i] || `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`,
+    }));
     const totalCost = textCost + (allUrls.length * 0.001);
     const genMs = Date.now() - start;
     const id = uuidv4();
     storage.save({ id, cacheKey, ageGroup: age_group, topic, visualStyle: visual_style, storyNodesJson: JSON.stringify(storyNodes), totalCostUsd: totalCost, generationMs: genMs });
-    return res.json({ lesson_id: id, metadata: { age_group, topic, visual_style }, story_nodes: storyNodes, cached: false, generation_ms: genMs, total_cost_usd: totalCost });
+    return res.json({
+      lesson_id: id,
+      metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang },
+      story_nodes: storyNodes, cached: false, generation_ms: genMs, total_cost_usd: totalCost,
+    });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: "Generation failed", message: e.message });

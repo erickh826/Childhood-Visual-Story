@@ -46,7 +46,8 @@ const IMAGE_COST_USD = 0.001;
 export async function generateStoryText(
   ageGroup: AgeGroup,
   topic: string,
-  visualStyle: VisualStyle
+  visualStyle: VisualStyle,
+  imageCount: number = 3
 ): Promise<{ nodes: Omit<StoryNode, "image_url">[]; imagePrompts: string[]; costUsd: number }> {
   const ageConstraints = AGE_PROMPTS[ageGroup];
 
@@ -55,7 +56,7 @@ Language rules: ${ageConstraints}
 Always write in Traditional Chinese (繁體中文) for avatar_script and button_text, but English for image prompts.
 Return ONLY valid JSON, no markdown or explanation.`;
 
-  const userPrompt = `Create an interactive story about: "${topic}"
+  const userPrompt = `Create an interactive story about: "${topic}" with exactly ${Math.max(imageCount, 4)} story nodes (root + branches + ending)
 Visual style for illustrations: ${visualStyle}
 
 Return this exact JSON structure:

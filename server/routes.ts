@@ -7,8 +7,9 @@ import { generateStoryText, generateImages, generateBranchNode } from "./ai";
 import { generateRequestSchema, branchRequestSchema } from "@shared/schema";
 import type { LessonPayload, StoryNode } from "@shared/schema";
 
-function makeCacheKey(params: { age_group: string; topic: string; visual_style: string }): string {
-  const str = `${params.age_group}|${params.topic.toLowerCase().trim()}|${params.visual_style}`;
+function makeCacheKey(params: { age_group: string; topic: string; visual_style: string; image_count?: number }): string {
+  const count = params.image_count ?? 3;
+  const str = `${params.age_group}|${params.topic.toLowerCase().trim()}|${params.visual_style}|${count}`;
   return createHash("md5").update(str).digest("hex");
 }
 
@@ -24,15 +25,16 @@ export function registerRoutes(httpServer: Server, app: Express) {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid request", details: parsed.error.issues });
     }
-    const { age_group, topic, visual_style } = parsed.data;
-    const cacheKey = makeCacheKey({ age_group, topic, visual_style });
+    const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-TW" } = parsed.data;
+    const clampedCount = Math.min(8, Math.max(1, image_count));
+    const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
 
     // ── Cache hit ─────────────────────────────────────────────────────────
     const cached = storage.getLessonByCacheKey(cacheKey);
     if (cached) {
       const payload: LessonPayload = {
         lesson_id: cached.id,
-        metadata: { age_group: cached.ageGroup as any, topic: cached.topic, visual_style: cached.visualStyle as any },
+        metadata: { age_group: cached.ageGroup as any, topic: cached.topic, visual_style: cached.visualStyle as any, image_count: clampedCount, voice_lang: voice_lang as any },
         story_nodes: JSON.parse(cached.storyNodesJson),
         cached: true,
         generation_ms: cached.generationMs || 0,
@@ -47,16 +49,15 @@ export function registerRoutes(httpServer: Server, app: Express) {
       const seed = makeSeed(cacheKey);
 
       // Generate text first (we need image prompts from text output)
-      const { nodes: textNodes, imagePrompts, costUsd: textCost } = await generateStoryText(age_group, topic, visual_style);
+      const { nodes: textNodes, imagePrompts, costUsd: textCost } = await generateStoryText(age_group, topic, visual_style, clampedCount);
 
       // Only generate images for root and branches, not ALL nodes — but for PoC generate main 3 in parallel
       // We generate images for root_01, branch_a, branch_b upfront; ending is the 4th
-      const mainImageCount = Math.min(imagePrompts.length, 3); // first 3
-      const remainingPrompts = imagePrompts.slice(3);
-
+      const usedPrompts = imagePrompts.slice(0, clampedCount);
+      const batchSize = 4;
       const [mainImages, remainingImages] = await Promise.all([
-        generateImages(imagePrompts.slice(0, mainImageCount), visual_style, seed),
-        remainingPrompts.length > 0 ? generateImages(remainingPrompts, visual_style, seed + 1) : Promise.resolve({ urls: [], costUsd: 0 }),
+        generateImages(usedPrompts.slice(0, batchSize), visual_style, seed),
+        usedPrompts.length > batchSize ? generateImages(usedPrompts.slice(batchSize), visual_style, seed + 1) : Promise.resolve({ urls: [], costUsd: 0 }),
       ]);
 
       const allImageUrls = [...mainImages.urls, ...remainingImages.urls];
@@ -84,7 +85,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
 
       const payload: LessonPayload = {
         lesson_id: lessonId,
-        metadata: { age_group, topic, visual_style },
+        metadata: { age_group, topic, visual_style, image_count: clampedCount, voice_lang: voice_lang as any },
         story_nodes: storyNodes,
         cached: false,
         generation_ms: genMs,
@@ -119,7 +120,8 @@ export function registerRoutes(httpServer: Server, app: Express) {
     }
 
     try {
-      const cacheKey = makeCacheKey({ age_group, topic, visual_style });
+      const clampedCount = Math.min(8, Math.max(1, image_count));
+    const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
       const seed = makeSeed(cacheKey) + node_id.charCodeAt(node_id.length - 1);
 
       const { node, costUsd } = await generateBranchNode({

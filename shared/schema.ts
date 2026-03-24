@@ -50,6 +50,8 @@ export interface LessonPayload {
     age_group: AgeGroup;
     topic: string;
     visual_style: VisualStyle;
+    image_count?: number;
+    voice_lang?: VoiceLang;
   };
   story_nodes: StoryNode[];
   cached: boolean;
@@ -57,11 +59,22 @@ export interface LessonPayload {
   total_cost_usd?: number;
 }
 
+export const VOICE_LANGS = ["zh-TW", "en-US", "zh-HK"] as const;
+export type VoiceLang = (typeof VOICE_LANGS)[number];
+
+export const VOICE_LANG_LABELS: Record<VoiceLang, string> = {
+  "zh-TW": "繁體中文（台灣）",
+  "en-US": "English (US)",
+  "zh-HK": "廣東話（香港）",
+};
+
 // Generate request schema
 export const generateRequestSchema = z.object({
   age_group: z.enum(AGE_GROUPS),
   topic: z.string().min(1).max(200),
   visual_style: z.enum(VISUAL_STYLES),
+  image_count: z.number().int().min(1).max(8).default(3),
+  voice_lang: z.enum(VOICE_LANGS).default("zh-TW"),
 });
 export type GenerateRequest = z.infer<typeof generateRequestSchema>;
 

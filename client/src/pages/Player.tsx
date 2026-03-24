@@ -51,18 +51,26 @@ function Avatar({ isTalking }: { isTalking: boolean }) {
 }
 
 // ── TTS narration ─────────────────────────────────────────────────────────────
-function useNarration() {
+function useNarration(lang: string = "zh-TW") {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const uttRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Rate / pitch tuning per language
+  const getLangSettings = (l: string) => {
+    if (l === "en-US") return { rate: 0.9, pitch: 1.1 };
+    if (l === "zh-HK") return { rate: 0.85, pitch: 1.1 };
+    return { rate: 0.85, pitch: 1.15 }; // zh-TW default
+  };
 
   const speak = (text: string) => {
     if (!enabled || typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = "zh-TW";
-    utt.rate = 0.85;
-    utt.pitch = 1.15;
+    const { rate, pitch } = getLangSettings(lang);
+    utt.lang = lang;
+    utt.rate = rate;
+    utt.pitch = pitch;
     utt.onstart = () => setIsSpeaking(true);
     utt.onend = () => setIsSpeaking(false);
     utt.onerror = () => setIsSpeaking(false);
@@ -94,7 +102,8 @@ export default function Player() {
   const [extraNodes, setExtraNodes] = useState<Map<string, StoryNode>>(new Map());
   const [showTeacherTip, setShowTeacherTip] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const { speak, isSpeaking, enabled, toggle, stop } = useNarration();
+  const [voiceLang, setVoiceLang] = useState<string>("zh-TW");
+  const { speak, isSpeaking, enabled, toggle, stop } = useNarration(voiceLang);
   const nodeRef = useRef<HTMLDivElement>(null);
 
   const { data: lesson, isLoading, isError } = useQuery({
@@ -151,6 +160,10 @@ export default function Player() {
   useEffect(() => {
     if (lesson?.story_nodes?.[0]) {
       setVisitedNodes([lesson.story_nodes[0]]);
+      // Apply voice language from lesson metadata
+      if (lesson.metadata.voice_lang) {
+        setVoiceLang(lesson.metadata.voice_lang);
+      }
       speak(lesson.story_nodes[0].avatar_script);
     }
   }, [lesson]);
@@ -207,6 +220,16 @@ export default function Player() {
               <Badge variant="outline" className="text-xs px-2 py-0 capitalize">
                 {{watercolor:"水彩風", crayon:"蠟筆風", kawaii:"可愛風"}[lesson.metadata.visual_style]}
               </Badge>
+              {lesson.metadata.voice_lang && (
+                <Badge variant="outline" className="text-xs px-2 py-0">
+                  {lesson.metadata.voice_lang === "zh-TW" ? "🇹🇼 台灣中文" : lesson.metadata.voice_lang === "en-US" ? "🇺🇸 English" : "🇭🇰 廣東話"}
+                </Badge>
+              )}
+              {lesson.metadata.image_count && (
+                <Badge variant="outline" className="text-xs px-2 py-0">
+                  🖼️ {lesson.metadata.image_count}張
+                </Badge>
+              )}
               {lesson.cached && (
                 <Badge className="text-xs px-2 py-0 bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300">
                   ⚡ 快取

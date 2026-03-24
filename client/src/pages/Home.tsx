@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import type { LessonPayload, AgeGroup, VisualStyle } from "@shared/schema";
-import { AGE_GROUPS, VISUAL_STYLES } from "@shared/schema";
-import { BookOpen, Sparkles, Clock, History } from "lucide-react";
+import type { LessonPayload, AgeGroup, VisualStyle, VoiceLang } from "@shared/schema";
+import { AGE_GROUPS, VISUAL_STYLES, VOICE_LANGS, VOICE_LANG_LABELS } from "@shared/schema";
+import { BookOpen, Sparkles, Clock, History, Images, Mic } from "lucide-react";
 import { Link } from "wouter";
 
 const PRESET_TOPICS = [
@@ -35,6 +35,8 @@ export default function Home() {
   const [ageGroup, setAgeGroup] = useState<AgeGroup>("4-5");
   const [topic, setTopic] = useState("");
   const [visualStyle, setVisualStyle] = useState<VisualStyle>("watercolor");
+  const [imageCount, setImageCount] = useState<number>(3);
+  const [voiceLang, setVoiceLang] = useState<VoiceLang>("zh-TW");
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -42,6 +44,8 @@ export default function Home() {
         age_group: ageGroup,
         topic: topic.trim(),
         visual_style: visualStyle,
+        image_count: imageCount,
+        voice_lang: voiceLang,
       });
       return res.json() as Promise<LessonPayload>;
     },
@@ -197,6 +201,73 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Image count */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Images className="w-4 h-4 text-primary" />
+                插圖數量：<span className="text-primary font-bold">{imageCount} 張</span>
+              </Label>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-4">1</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={8}
+                  value={imageCount}
+                  onChange={(e) => setImageCount(Number(e.target.value))}
+                  data-testid="slider-image-count"
+                  className="flex-1 h-2 rounded-full accent-primary cursor-pointer"
+                  style={{ accentColor: "hsl(var(--primary))" }}
+                />
+                <span className="text-xs text-muted-foreground w-4">8</span>
+              </div>
+              <div className="flex justify-between px-1">
+                {[1,2,3,4,5,6,7,8].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setImageCount(n)}
+                    data-testid={`btn-img-count-${n}`}
+                    className={`w-7 h-7 rounded-full text-xs font-semibold transition-all cursor-pointer
+                      ${imageCount === n
+                        ? "bg-primary text-white shadow-sm scale-110"
+                        : "bg-muted/60 text-muted-foreground hover:bg-primary/20 hover:text-primary"
+                      }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Voice language */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Mic className="w-4 h-4 text-primary" />
+                語音朗讀語言
+              </Label>
+              <div className="grid grid-cols-3 gap-3">
+                {VOICE_LANGS.map((lang) => (
+                  <button
+                    key={lang}
+                    data-testid={`btn-voice-${lang}`}
+                    onClick={() => setVoiceLang(lang)}
+                    className={`py-2.5 px-3 rounded-xl border-2 text-center transition-all duration-200 cursor-pointer
+                      ${voiceLang === lang
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border bg-background hover:border-primary/50 hover:bg-primary/5"
+                      }`}
+                  >
+                    <div className="text-lg mb-0.5">
+                      {lang === "zh-TW" ? "🇹🇼" : lang === "en-US" ? "🇺🇸" : "🇭🇰"}
+                    </div>
+                    <div className={`text-xs font-semibold leading-tight ${voiceLang === lang ? "text-primary" : "text-foreground"}`}>
+                      {VOICE_LANG_LABELS[lang]}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Generate button */}
             <Button
               data-testid="btn-generate"
@@ -232,7 +303,7 @@ export default function Home() {
             {/* Cost estimate */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-xl p-3">
               <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>預估生成時間：10-15 秒 | 每次費用：&lt; $0.03 USD | 相同參數第二次：&lt;1 秒（快取）</span>
+              <span>預估生成時間：10-20 秒 | 圖片費用：約 ${(imageCount * 0.001).toFixed(3)} USD | 相同參數第二次：&lt;1 秒（快取）</span>
             </div>
           </CardContent>
         </Card>
