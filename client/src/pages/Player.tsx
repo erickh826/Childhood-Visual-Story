@@ -339,22 +339,10 @@ export default function Player() {
   useEffect(() => {
     if (lesson?.story_nodes?.[0]) {
       setVisitedNodes([lesson.story_nodes[0]]);
-<<<<<<< HEAD
-      if (lesson.metadata.voice_lang) {
-        // Update both ref and state so UI and narration are in sync
-        langRef.current = lesson.metadata.voice_lang;
-        setVoiceLang(lesson.metadata.voice_lang);
-      }
-      if (lesson.metadata.avatar_style) {
-        setAvatarStyle(lesson.metadata.avatar_style as AvatarStyle);
-      }
-      // Speak after a short delay to allow the browser to initialise voices
-=======
       const lang = lesson.metadata.voice_lang ?? "zh-TW";
       if (lesson.metadata.voice_lang) setVoiceLang(lang);
       if (lesson.metadata.avatar_style) setAvatarStyle(lesson.metadata.avatar_style as AvatarStyle);
       // Pass lang directly — does NOT depend on voiceLang state at all
->>>>>>> cbd1f03730bc7dae46632f253b482ff57a30c6f2
       const text = lesson.story_nodes[0].avatar_script;
       setTimeout(() => speakText(text, lang), 600);
     }
