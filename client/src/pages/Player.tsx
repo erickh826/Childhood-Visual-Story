@@ -302,17 +302,25 @@ export default function Player() {
   });
 
   const branchMutation = useMutation({
-    mutationFn: async (choice: { button_text: string; next_node_id: string }) => {
-      const currentNode = getAllNodes().find((n) => n.node_id === currentNodeId);
+    mutationFn: async (params: {
+      choice: { button_text: string; next_node_id: string };
+      lessonId: string;
+      parentScript: string;
+      ageGroup: string;
+      topic: string;
+      visualStyle: string;
+      voiceLang: string;
+    }) => {
       const res = await apiRequest("POST", "/api/branch", {
-        lesson_id: lessonId,
-        node_id: choice.next_node_id,
-        choice_key: choice.next_node_id,
-        parent_script_context: currentNode?.avatar_script || "",
-        age_group: lesson?.metadata.age_group,
-        topic: lesson?.metadata.topic,
-        visual_style: lesson?.metadata.visual_style,
-        choice_text: choice.button_text,
+        lesson_id: params.lessonId,
+        node_id: params.choice.next_node_id,
+        choice_key: params.choice.next_node_id,
+        parent_script_context: params.parentScript,
+        age_group: params.ageGroup,
+        topic: params.topic,
+        visual_style: params.visualStyle,
+        choice_text: params.choice.button_text,
+        voice_lang: params.voiceLang,
       });
       return res.json() as Promise<{ node: StoryNode; cached: boolean }>;
     },
@@ -517,7 +525,15 @@ export default function Player() {
                         onClick={() => {
                           const existing = getAllNodes().find((n) => n.node_id === choice.next_node_id);
                           if (existing) navigateTo(choice.next_node_id, existing);
-                          else branchMutation.mutate(choice);
+                          else branchMutation.mutate({
+                            choice,
+                            lessonId: lessonId!,
+                            parentScript: currentNode.avatar_script || "",
+                            ageGroup: lesson!.metadata.age_group,
+                            topic: lesson!.metadata.topic,
+                            visualStyle: lesson!.metadata.visual_style,
+                            voiceLang,
+                          });
                         }}
                         disabled={branchMutation.isPending}
                         className={`choice-btn ${i === 0 ? "bg-primary text-white border-primary hover:bg-primary/90" : "bg-sky-500 text-white border-sky-500 hover:bg-sky-400"}`}
