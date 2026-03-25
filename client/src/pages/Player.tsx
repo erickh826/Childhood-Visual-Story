@@ -423,7 +423,7 @@ export default function Player() {
             </div>
           </div>
 
-          <Button variant="ghost" size="icon" onClick={toggle} data-testid="btn-voice-toggle" className="shrink-0" aria-label={enabled ? "關閉語音" : "開啟語音"}>
+          <Button variant="ghost" size="icon" onClick={toggle} data-testid="btn-voice-toggle" className="shrink-0" aria-label={voiceEnabled ? "關閉語音" : "開啟語音"}>
             {voiceEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
           </Button>
         </div>

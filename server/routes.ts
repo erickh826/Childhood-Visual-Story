@@ -120,11 +120,10 @@ export function registerRoutes(httpServer: Server, app: Express) {
     }
 
     try {
-      const clampedCount = Math.min(8, Math.max(1, image_count));
-    const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
+      const cacheKey = makeCacheKey({ age_group, topic, visual_style });
       const seed = makeSeed(cacheKey) + node_id.charCodeAt(node_id.length - 1);
+      const voiceLang = req.body.voice_lang || "zh-TW";
 
-      const voiceLangFromLesson = lesson?.ageGroup ? (storage.getLessonById(lesson_id)?.storyNodesJson ? "zh-TW" : "zh-TW") : "zh-TW";
       const { node, costUsd } = await generateBranchNode({
         ageGroup: age_group as any,
         topic,
@@ -133,7 +132,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
         parentContext: parent_script_context,
         nodeId: node_id,
         seed,
-        voiceLang: req.body.voice_lang || "zh-TW",
+        voiceLang,
       });
 
       // Append new node to cached lesson

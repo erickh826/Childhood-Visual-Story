@@ -246,7 +246,8 @@ app.use((_req: Request, res: express.Response, next: NextFunction) => {
   next();
 });
 
-app.options("*", (_req: Request, res: express.Response) => {
+// Handle CORS preflight
+app.options("/(.*)", (_req, res) => {
   res.sendStatus(204);
 });
 
