@@ -243,12 +243,11 @@ app.use((_req: Request, res: express.Response, next: NextFunction) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (_req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
   next();
-});
-
-// Handle CORS preflight
-app.options("*", (_req, res) => {
-  res.sendStatus(204);
 });
 
 // POST /api/generate
