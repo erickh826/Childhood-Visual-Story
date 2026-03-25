@@ -21,6 +21,8 @@ interface LessonRecord {
   ageGroup: string;
   topic: string;
   visualStyle: string;
+  voiceLang: string;
+  avatarStyle: string;
   storyNodesJson: string;
   totalCostUsd: number | null;
   generationMs: number | null;
@@ -318,6 +320,8 @@ app.post("/api/generate", async (req: Request, res: express.Response) => {
       ageGroup: age_group,
       topic: safeTopic,
       visualStyle: visual_style,
+      voiceLang: voice_lang,
+      avatarStyle: avatar_style,
       storyNodesJson: JSON.stringify(storyNodes),
       totalCostUsd: totalCost,
       generationMs: genMs,
@@ -448,6 +452,8 @@ app.get("/api/lessons/:id", (req: Request, res: express.Response) => {
       age_group: lesson.ageGroup,
       topic: lesson.topic,
       visual_style: lesson.visualStyle,
+      voice_lang: lesson.voiceLang,
+      avatar_style: lesson.avatarStyle,
     },
     story_nodes: JSON.parse(lesson.storyNodesJson),
     cached: true,
