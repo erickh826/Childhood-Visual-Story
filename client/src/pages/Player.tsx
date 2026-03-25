@@ -8,6 +8,13 @@ import { Card } from "@/components/ui/card";
 import type { LessonPayload, StoryNode, AvatarStyle } from "@shared/schema";
 import { AVATAR_STYLES, AVATAR_LABELS } from "@shared/schema";
 import { ArrowLeft, BookOpen, GraduationCap, Volume2, VolumeX } from "lucide-react";
+
+// Language options for voice narration
+const LANG_OPTIONS = [
+  { value: "zh-TW", label: "國語" },
+  { value: "zh-HK", label: "粵語" },
+  { value: "en-US", label: "English" },
+];
 import { Link } from "wouter";
 
 // ── Avatar SVG characters ─────────────────────────────────────────────────────
@@ -346,7 +353,7 @@ export default function Player() {
       const text = lesson.story_nodes[0].avatar_script;
       setTimeout(() => speakText(text, lang), 600);
     }
-  }, [lesson, langRef, speak]);
+  }, [lesson, speak]);
 
   const currentNode = getCurrentNode();
   const baseNodeCount = lesson?.story_nodes?.length || 4;
@@ -401,10 +408,7 @@ export default function Player() {
               {/* Language selector for narration */}
               <select
                 value={voiceLang}
-                onChange={e => {
-                  setVoiceLang(e.target.value);
-                  langRef.current = e.target.value;
-                }}
+                onChange={e => setVoiceLang(e.target.value)}
                 className="text-xs px-2 py-0 border rounded bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
                 aria-label="語音語言選擇"
                 style={{ minWidth: 80 }}
