@@ -82,7 +82,7 @@ Language rules: ${ageConstraints}
 ${getContentLangInstruction(voiceLang)}
 Return ONLY valid JSON, no markdown or explanation.`;
 
-  const userPrompt = `Create an interactive story about: "${topic}" with exactly ${Math.max(imageCount, 4)} story nodes (root + branches + ending)
+  const userPrompt = `Create an interactive story about: "${topic}" with exactly ${Math.max(imageCount, 3)} story nodes (root + branches + ending)
 Visual style for illustrations: ${visualStyle}
 
 Return this exact JSON structure:
