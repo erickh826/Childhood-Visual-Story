@@ -85,7 +85,7 @@ export const generateRequestSchema = z.object({
   topic: z.string().min(1).max(200),
   visual_style: z.enum(VISUAL_STYLES),
   image_count: z.number().int().min(1).max(8).default(3),
-  voice_lang: z.enum(VOICE_LANGS).default("zh-TW"),
+  voice_lang: z.enum(VOICE_LANGS).default("zh-HK"),
   avatar_style: z.enum(AVATAR_STYLES).default("bear"),
 });
 export type GenerateRequest = z.infer<typeof generateRequestSchema>;
