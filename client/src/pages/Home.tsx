@@ -31,7 +31,7 @@ export default function Home() {
   const [topic, setTopic] = useState("");
   const [visualStyle, setVisualStyle] = useState<VisualStyle>("watercolor");
   const [imageCount] = useState<number>(3);
-  const [voiceLang] = useState<VoiceLang>("zh-TW");
+  const [voiceLang] = useState<VoiceLang>("zh-HK");
   const [avatarStyle] = useState<AvatarStyle>("bear");
 
   const generateMutation = useMutation({

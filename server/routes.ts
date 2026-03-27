@@ -25,7 +25,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid request", details: parsed.error.issues });
     }
-    const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-TW", avatar_style = "bear" } = parsed.data;
+    const { age_group, topic, visual_style, image_count = 3, voice_lang = "zh-HK", avatar_style = "bear" } = parsed.data;
     const clampedCount = Math.min(8, Math.max(1, image_count));
     const cacheKey = makeCacheKey({ age_group, topic, visual_style, image_count: clampedCount });
 
@@ -120,7 +120,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
     try {
       const cacheKey = makeCacheKey({ age_group, topic, visual_style });
       const seed = makeSeed(cacheKey) + node_id.charCodeAt(node_id.length - 1);
-      const voiceLang = req.body.voice_lang || "zh-TW";
+      const voiceLang = req.body.voice_lang || "zh-HK";
 
       const { node, costUsd } = await generateBranchNode({
         ageGroup: age_group as any,

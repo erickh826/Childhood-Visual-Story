@@ -26,7 +26,7 @@ const CONTENT_LANG_INSTRUCTIONS: Record<string, string> = {
   "en-US": "Write ALL text fields (avatar_script, teacher_prompt, button_text) in English. image_prompt must also be in English.",
 };
 function getContentLangInstruction(voiceLang?: string) {
-  return CONTENT_LANG_INSTRUCTIONS[voiceLang ?? "zh-TW"] ?? CONTENT_LANG_INSTRUCTIONS["zh-TW"];
+  return CONTENT_LANG_INSTRUCTIONS[voiceLang ?? "zh-HK"] ?? CONTENT_LANG_INSTRUCTIONS["zh-HK"];
 }
 // ── Age → prompt constraints ─────────────────────────────────────────────────
 const AGE_PROMPTS: Record<AgeGroup, string> = {
@@ -73,7 +73,7 @@ export async function generateStoryText(
   topic: string,
   visualStyle: VisualStyle,
   imageCount: number = 3,
-  voiceLang: string = "zh-TW"
+  voiceLang: string = "zh-HK"
 ): Promise<{ nodes: Omit<StoryNode, "image_url">[]; imagePrompts: string[]; costUsd: number }> {
   const ageConstraints = AGE_PROMPTS[ageGroup];
 
@@ -222,7 +222,7 @@ export async function generateBranchNode(params: {
   seed: number;
   voiceLang?: string;
 }): Promise<{ node: StoryNode; costUsd: number }> {
-  const { ageGroup, topic, visualStyle, choiceText, parentContext, nodeId, seed, voiceLang = "zh-TW" } = params;
+  const { ageGroup, topic, visualStyle, choiceText, parentContext, nodeId, seed, voiceLang = "zh-HK" } = params;
   const ageConstraints = AGE_PROMPTS[ageGroup];
   const langInstruction = getContentLangInstruction(voiceLang);
 

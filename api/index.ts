@@ -2,7 +2,7 @@
 function getLangInstruction(lang: string): string {
   if (lang === "en-US") return "All story text and prompts must be in English.";
   if (lang === "zh-HK") return "All story text and prompts must be in Cantonese (粵語, zh-HK), using Traditional Chinese characters.";
-  return "All story text and prompts must be in Traditional Chinese (繁體中文, zh-TW).";
+  return "All story text and prompts must be in Cantonese (粵語, zh-HK), using Traditional Chinese characters.";
 }
 
 import express, { type Request, type NextFunction } from "express";
@@ -128,7 +128,7 @@ function createOpenAIClient(): AzureOpenAI {
   });
 }
 
-async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle, voiceLang: string = "zh-TW", imageCount: number = 4) {
+async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle, voiceLang: string = "zh-HK", imageCount: number = 4) {
   const openai = createOpenAIClient();
   const ageC = AGE_PROMPTS[ageGroup];
   const safeTopic = sanitizeTopic(topic);
@@ -270,7 +270,7 @@ app.post("/api/generate", async (req: Request, res: express.Response) => {
     topic,
     visual_style,
     image_count = 3,
-    voice_lang = "zh-TW",
+    voice_lang = "zh-HK",
     avatar_style = "bear",
   } = req.body;
 
@@ -364,7 +364,7 @@ app.post("/api/branch", async (req: Request, res: express.Response) => {
     visual_style,
     choice_text,
     parent_script_context,
-    voice_lang = "zh-TW",
+    voice_lang = "zh-HK",
   } = req.body;
 
   const lesson = storage.getById(lesson_id);
