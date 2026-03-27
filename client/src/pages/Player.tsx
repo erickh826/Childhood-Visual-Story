@@ -9,12 +9,6 @@ import type { LessonPayload, StoryNode, AvatarStyle } from "@shared/schema";
 import { AVATAR_STYLES, AVATAR_LABELS } from "@shared/schema";
 import { ArrowLeft, BookOpen, GraduationCap, Volume2, VolumeX } from "lucide-react";
 
-// Language options for voice narration
-const LANG_OPTIONS = [
-  { value: "zh-TW", label: "國語" },
-  { value: "zh-HK", label: "粵語" },
-  { value: "en-US", label: "English" },
-];
 import { Link } from "wouter";
 
 // ── Avatar SVG characters ─────────────────────────────────────────────────────
@@ -259,7 +253,7 @@ export default function Player() {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   // Voice: simple state values, passed directly to speakText() each call
-  const [voiceLang, setVoiceLang] = useState<string>("zh-TW");
+  const [voiceLang, setVoiceLang] = useState<string>("zh-HK");
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>("bear");
@@ -354,7 +348,7 @@ export default function Player() {
   useEffect(() => {
     if (lesson?.story_nodes?.[0]) {
       setVisitedNodes([lesson.story_nodes[0]]);
-      const lang = lesson.metadata.voice_lang ?? "zh-TW";
+      const lang = lesson.metadata.voice_lang ?? "zh-HK";
       if (lesson.metadata.voice_lang) setVoiceLang(lang);
       if (lesson.metadata.avatar_style) setAvatarStyle(lesson.metadata.avatar_style as AvatarStyle);
       // Pass lang directly — does NOT depend on voiceLang state at all
@@ -413,19 +407,6 @@ export default function Player() {
               <Badge variant="outline" className="text-xs px-2 py-0 capitalize">
                 {{ watercolor: "水彩風", crayon: "蠟筆風", kawaii: "可愛風" }[lesson.metadata.visual_style]}
               </Badge>
-              {/* Language selector for narration */}
-              <select
-                value={voiceLang}
-                onChange={e => setVoiceLang(e.target.value)}
-                className="text-xs px-2 py-0 border rounded bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                aria-label="語音語言選擇"
-                style={{ minWidth: 80 }}
-                data-testid="select-voice-lang"
-              >
-                {LANG_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
               {lesson.metadata.image_count && (
                 <Badge variant="outline" className="text-xs px-2 py-0">🖼️ {lesson.metadata.image_count}張</Badge>
               )}
