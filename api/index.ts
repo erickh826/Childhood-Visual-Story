@@ -128,10 +128,11 @@ function createOpenAIClient(): AzureOpenAI {
   });
 }
 
-async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle, voiceLang: string = "zh-TW") {
+async function generateStory(ageGroup: AgeGroup, topic: string, visualStyle: VisualStyle, voiceLang: string = "zh-TW", imageCount: number = 4) {
   const openai = createOpenAIClient();
   const ageC = AGE_PROMPTS[ageGroup];
   const safeTopic = sanitizeTopic(topic);
+  const totalNodes = Math.max(imageCount, 4); // always at least root + 2 branches + ending
   const resp = await openai.chat.completions.create({
     model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4o-mini",
     messages: [
@@ -144,7 +145,7 @@ Return ONLY valid JSON, no markdown.`,
       },
       {
         role: "user",
-        content: `Create an interactive story about: "${safeTopic}", visual style: ${visualStyle}.
+        content: `Create an interactive story about: "${safeTopic}", visual style: ${visualStyle}. Generate exactly ${totalNodes} nodes.
 Return this exact JSON:
 {
   "nodes": [
@@ -214,22 +215,32 @@ async function generateImages(prompts: string[], style: VisualStyle, seed: numbe
   const suffix = STYLE_PROMPTS[style];
   return Promise.all(prompts.map(async (p) => {
     try {
-      const r = await globalThis.fetch("https://fal.run/fal-ai/flux/schnell", {
-        method: "POST",
-        headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: `${p}, ${suffix}`,
-          negative_prompt: NEGATIVE,
-          image_size: "square_hd",
-          num_inference_steps: 4,
-          seed,
-          num_images: 1,
-          enable_safety_checker: true,
-        }),
-      }, 25000);  // 25s timeout per image
+      const r = await fetchWithTimeout(
+        "https://fal.run/fal-ai/flux/schnell",
+        {
+          method: "POST",
+          headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: `${p}, ${suffix}`,
+            negative_prompt: NEGATIVE,
+            image_size: "square_hd",
+            num_inference_steps: 4,
+            seed,
+            num_images: 1,
+            enable_safety_checker: true,
+          }),
+        },
+        25000,
+      );
+      if (!r.ok) {
+        const errText = await r.text();
+        console.error(`[fal.ai] HTTP ${r.status}:`, errText);
+        return `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`;
+      }
       const d: any = await r.json();
       return d.images?.[0]?.url || `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`;
-    } catch {
+    } catch (e) {
+      console.error("[fal.ai] Request failed:", e);
       return `https://placehold.co/512x512/FFE4B5/8B4513?text=Image`;
     }
   }));
@@ -293,14 +304,15 @@ app.post("/api/generate", async (req: Request, res: express.Response) => {
       safeTopic,
       visual_style as VisualStyle,
       voice_lang,
+      clampedCount,
     );
 
-    const usedPrompts = prompts.slice(0, clampedCount);
+    // Generate images for every story node — never slice prompts short
     const batchSize = 4;
     const [firstUrls, secondUrls] = await Promise.all([
-      generateImages(usedPrompts.slice(0, batchSize), visual_style as VisualStyle, seed),
-      usedPrompts.length > batchSize
-        ? generateImages(usedPrompts.slice(batchSize), visual_style as VisualStyle, seed + 1)
+      generateImages(prompts.slice(0, batchSize), visual_style as VisualStyle, seed),
+      prompts.length > batchSize
+        ? generateImages(prompts.slice(batchSize), visual_style as VisualStyle, seed + 1)
         : Promise.resolve([] as string[]),
     ]);
     const allUrls = [...firstUrls, ...secondUrls];
@@ -420,7 +432,7 @@ app.post("/api/branch", async (req: Request, res: express.Response) => {
 });
 
 // GET /api/health — quick liveness check
-app.get("/api/health", (_req: Request, res: Response) => {
+app.get("/api/health", (_req: Request, res: express.Response) => {
   res.json({ status: "ok", ts: Date.now() });
 });
 

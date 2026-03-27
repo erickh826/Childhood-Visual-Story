@@ -51,13 +51,11 @@ export function registerRoutes(httpServer: Server, app: Express) {
       // Generate text first (we need image prompts from text output)
       const { nodes: textNodes, imagePrompts, costUsd: textCost } = await generateStoryText(age_group, topic, visual_style, clampedCount, voice_lang);
 
-      // Only generate images for root and branches, not ALL nodes — but for PoC generate main 3 in parallel
-      // We generate images for root_01, branch_a, branch_b upfront; ending is the 4th
-      const usedPrompts = imagePrompts.slice(0, clampedCount);
+      // Generate images for every story node — never slice prompts short
       const batchSize = 4;
       const [mainImages, remainingImages] = await Promise.all([
-        generateImages(usedPrompts.slice(0, batchSize), visual_style, seed),
-        usedPrompts.length > batchSize ? generateImages(usedPrompts.slice(batchSize), visual_style, seed + 1) : Promise.resolve({ urls: [], costUsd: 0 }),
+        generateImages(imagePrompts.slice(0, batchSize), visual_style, seed),
+        imagePrompts.length > batchSize ? generateImages(imagePrompts.slice(batchSize), visual_style, seed + 1) : Promise.resolve({ urls: [], costUsd: 0 }),
       ]);
 
       const allImageUrls = [...mainImages.urls, ...remainingImages.urls];
